@@ -56,7 +56,7 @@ spec:
   #     --from-file=identity=./deploy-key \
   #     --from-file=identity.pub=./deploy-key.pub \
   #     --from-file=known_hosts=./known_hosts
-  url: ssh://git@github.com/YOUR-ORG/YOUR-FORK.git
+  url: ssh://git@github.com/sasin91/trongate-cloud-infra.git
   secretRef:
     name: flux-system
 ---

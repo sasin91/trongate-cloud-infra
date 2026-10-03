@@ -102,12 +102,15 @@ spec:
       #
       # Keep the disk limit comfortably under the volume size. VictoriaLogs
       # needs headroom to merge parts.
-      retentionPeriod: "14d"
-      retentionDiskSpaceUsage: "40GB"
+      #
+      # TRONGATE-CLOUD single-node profile: 7 days, capped at 8GB on a 10Gi
+      # volume (was 14d / 40GB / 50Gi).
+      retentionPeriod: "7d"
+      retentionDiskSpaceUsage: "8GB"
 
       persistentVolume:
         enabled: true
-        size: 50Gi
+        size: 10Gi
         accessModes:
           - ReadWriteOnce
         # storageClassName intentionally unset — see the note in
@@ -116,10 +119,10 @@ spec:
 
       resources:
         requests:
-          cpu: 200m
-          memory: 512Mi
+          cpu: 100m
+          memory: 256Mi
         limits:
-          memory: 2Gi
+          memory: 1Gi
 
       # Native VM scrape object. The chart also offers a ServiceMonitor; it is
       # left off because the Prometheus converter is disabled cluster-wide.

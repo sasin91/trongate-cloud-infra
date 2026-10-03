@@ -12,23 +12,26 @@
 # A component with no scrape here is a component nobody is watching. That
 # includes the components doing the watching.
 
-# Tempo's own metrics. Without this, the trace store's ingestion rate,
-# compaction backlog and block flush failures are invisible — and a trace store
-# that has stopped accepting spans looks exactly like a quiet week.
-apiVersion: operator.victoriametrics.com/v1beta1
-kind: VMServiceScrape
-metadata:
-  name: tempo
-  namespace: observability
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: tempo
-      app.kubernetes.io/instance: tempo
-  endpoints:
-    - port: tempo-prom-metrics
-      path: /metrics
-      interval: 30s
+# TRONGATE-CLOUD: Tempo is not installed in the single-node profile; its
+# scrape is kept commented for the day it returns.
+#
+# # Tempo's own metrics. Without this, the trace store's ingestion rate,
+# # compaction backlog and block flush failures are invisible — and a trace store
+# # that has stopped accepting spans looks exactly like a quiet week.
+# apiVersion: operator.victoriametrics.com/v1beta1
+# kind: VMServiceScrape
+# metadata:
+#   name: tempo
+#   namespace: observability
+# spec:
+#   selector:
+#     matchLabels:
+#       app.kubernetes.io/name: tempo
+#       app.kubernetes.io/instance: tempo
+#   endpoints:
+#     - port: tempo-prom-metrics
+#       path: /metrics
+#       interval: 30s
 ---
 # blackbox-exporter's own health, as distinct from the results of its probes.
 # The probe results say whether the targets are up; this says whether the thing

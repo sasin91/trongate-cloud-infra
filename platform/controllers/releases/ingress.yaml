@@ -71,18 +71,20 @@ spec:
     # being ignored. That is the good failure mode, and it is worth saying so --
     # a chart that silently accepted an unknown key would have left tracing off
     # while reporting success.
-    tracing:
-      # A STATED SAMPLING POLICY, not a default. 1.0 keeps every trace, which is
-      # affordable on a small cluster and is not on a busy one. Lower it before
-      # traffic makes the decision for you.
-      sampleRate: 1.0
-      addInternals: false
-      otlp:
-        enabled: true
-        grpc:
-          enabled: true
-          endpoint: opentelemetry-collector.observability.svc.cluster.local:4317
-          insecure: true
+    # TRONGATE-CLOUD: tracing OFF. The single-node profile does not run the
+    # collector or Tempo (see platform/observability/controllers), and exporting
+    # to an address that does not exist only produces retry noise. Restore the
+    # block below together with those two releases.
+    #
+    # tracing:
+    #   sampleRate: 1.0
+    #   addInternals: false
+    #   otlp:
+    #     enabled: true
+    #     grpc:
+    #       enabled: true
+    #       endpoint: opentelemetry-collector.observability.svc.cluster.local:4317
+    #       insecure: true
 
     # The access log carries trace and span identifiers, which is what lets a log
     # line lead to a request and a request lead back to its logs. Shipping traces
@@ -94,34 +96,36 @@ spec:
         headers:
           # Headers carry credentials far more often than anyone intends.
           defaultMode: drop
+    # ingress-ha waiver: TRONGATE-CLOUD single-node profile. One node, so a
+    # second replica has nowhere to go and the kit's required anti-affinity
+    # would leave every rolling update Pending. A disruption budget on one
+    # replica blocks every drain. Both come back with the second node: set
+    # replicas to 2, restore the PDB and the anti-affinity below, and remove
+    # this waiver (scripts/checks/check-ingress-ha.py reads it).
     deployment:
-      # More than one. Raise this and the anti-affinity constraint together:
-      # the anti-affinity below is `required`, so a replica count higher than
-      # the number of schedulable nodes leaves a pod Pending forever — and a
-      # Pending pod plus a disruption budget blocks every subsequent drain.
-      replicas: 2
+      replicas: 1
 
-    # A cluster that applies unattended operating-system updates drains nodes to
-    # reboot them. A drain evicts pods; it honours a disruption budget and has
-    # no obligation to anything without one. This is the object that turns "two
-    # replicas" into "two replicas are still running an hour from now".
     podDisruptionBudget:
-      enabled: true
-      minAvailable: 1
+      enabled: false
 
-    # Spread across nodes, required rather than preferred. `preferred` is a
-    # wish: the scheduler is free to place both replicas on one node, and then
-    # a single node reboot takes the whole ingress with it — silently, because
-    # the deployment still reports two ready replicas right up until the drain.
-    # The chart renders this value as a template, hence the braces.
-    affinity:
-      podAntiAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchLabels:
-                app.kubernetes.io/name: '{{ template "traefik.name" . }}'
-                app.kubernetes.io/instance: '{{ .Release.Name }}-{{ include "traefik.namespace" . }}'
-            topologyKey: kubernetes.io/hostname
+    # affinity:
+    #   podAntiAffinity:
+    #     requiredDuringSchedulingIgnoredDuringExecution:
+    #       - labelSelector:
+    #           matchLabels:
+    #             app.kubernetes.io/name: '{{ template "traefik.name" . }}'
+    #             app.kubernetes.io/instance: '{{ .Release.Name }}-{{ include "traefik.namespace" . }}'
+    #         topologyKey: kubernetes.io/hostname
+
+    # TRONGATE-CLOUD: the Sablier plugin. trongate.cloud's worker puts a
+    # traefik.io Middleware using it in front of every scale-to-zero app
+    # (Manifests::SABLIER_PLUGIN must match the name "sablier"). Traefik
+    # downloads the plugin source from GitHub at start-up.
+    experimental:
+      plugins:
+        sablier:
+          moduleName: github.com/sablierapp/sablier-traefik-plugin
+          version: v1.3.1
 
     # NO CERTIFICATE RESOLVER. Empty on purpose, and checked in CI: an ACME
     # resolver configured here alongside cert-manager means somebody
@@ -137,8 +141,17 @@ spec:
       # route source — Ingress, or this controller's own IngressRoute — is a
       # second, unpoliced way to claim the same hostname, and an inner control
       # that only covers one of two doors is one layer wearing a costume.
+      #
+      # TRONGATE-CLOUD: kubernetesCRD is ON, because a Gateway API ExtensionRef
+      # filter can only name a traefik.io Middleware when this provider is
+      # enabled, and Sablier is such a Middleware. That reopens IngressRoute as
+      # a second door; platform/configs/admission/deny-traefik-routes.yaml shuts
+      # it by refusing IngressRoute, IngressRouteTCP and IngressRouteUDP
+      # everywhere. Middlewares stay namespace-local (allowCrossNamespace).
       kubernetesCRD:
-        enabled: false
+        enabled: true
+        allowCrossNamespace: false
+        allowExternalNameServices: false
       kubernetesIngress:
         enabled: false
       kubernetesGateway:
@@ -187,6 +200,16 @@ spec:
     service:
       spec:
         type: LoadBalancer
+        # TRONGATE-CLOUD: with k3s servicelb (enable_klipper_lb) the node's own
+        # IPv4 is the entry point and Local keeps the client's real address --
+        # no PROXY protocol needed. Back to Cluster (and the PROXY protocol pair
+        # below) when moving to a Hetzner load balancer.
+        externalTrafficPolicy: Local
+      # TRONGATE-CLOUD: INERT while enable_klipper_lb = true -- the cloud
+      # controller runs with HCLOUD_LOAD_BALANCERS_ENABLED=false and creates no
+      # load balancer. Kept, with the location set to the node's, so that moving
+      # to an lb11 (EUR 7.49/month in hel1, 2026-10-03) is flipping
+      # enable_klipper_lb to false plus the two notes above and below.
       annotations:
         # The only provider-coupled lines in platform/. They have to be here:
         # this Service is what causes a load balancer to exist.
@@ -206,7 +229,7 @@ spec:
         # MUST MATCH the location your nodes are in -- see the node layer's
         # control_plane_location. A load balancer in another location cannot
         # reach them over the private network.
-        load-balancer.hetzner.cloud/location: "fsn1"
+        load-balancer.hetzner.cloud/location: "hel1"
         load-balancer.hetzner.cloud/type: "lb11"
         # Reach the nodes over the private network rather than their public
         # addresses. Keeps the hop off the internet and out of the firewall.

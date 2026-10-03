@@ -1,0 +1,19 @@
+---
+# TRONGATE-CLOUD: the image registry behind PLATFORM_REGISTRY
+# (registry.trongate.cloud/tc), on Hetzner Object Storage.
+#
+# The kit deliberately ships no registry; trongate.cloud needs one because the
+# worker pushes every tenant build to it and the node pulls from it. This is the
+# smallest credible one: CNCF distribution, S3 driver, htpasswd with a push user
+# (the worker's registry-push Secret) and a pull user (the nodes'
+# registries.yaml, set through OpenTofu's registries_config).
+#
+# Not here yet, on purpose (see TRONGATE-CLOUD.md): garbage collection
+# (distribution's `garbage-collect` needs the registry read-only while it runs)
+# and per-repository push tokens (trongate.cloud's own open item).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - registry.yaml
+  - secrets

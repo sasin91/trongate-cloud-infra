@@ -1,0 +1,20 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: mariadb-operator
+  namespace: flux-system
+spec:
+  type: default
+  url: https://helm.mariadb.com/mariadb-operator
+  interval: 24h
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: juicefs
+  namespace: flux-system
+spec:
+  type: default
+  url: https://juicedata.github.io/charts/
+  interval: 24h

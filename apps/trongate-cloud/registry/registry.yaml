@@ -1,0 +1,147 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry
+  namespace: registry
+  labels:
+    app.kubernetes.io/name: registry
+spec:
+  replicas: 1
+  # Recreate: two registry processes against one bucket would be safe, but on
+  # one node a surge pod only costs memory during a rollout.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: registry
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: registry
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: registry
+          # 3.1.2 -- latest distribution release on 2026-10-03; amd64+arm64.
+          image: registry:3.1.2
+          ports:
+            - name: http
+              containerPort: 5000
+          env:
+            - name: REGISTRY_HTTP_ADDR
+              value: ":5000"
+            # Behind Traefik, which terminates TLS for registry.trongate.cloud.
+            - name: REGISTRY_HTTP_HOST
+              value: https://registry.trongate.cloud
+            - name: REGISTRY_HTTP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: registry-config
+                  key: http-secret
+            - name: REGISTRY_AUTH
+              value: htpasswd
+            - name: REGISTRY_AUTH_HTPASSWD_REALM
+              value: registry.trongate.cloud
+            - name: REGISTRY_AUTH_HTPASSWD_PATH
+              value: /auth/htpasswd
+            - name: REGISTRY_STORAGE
+              value: s3
+            - name: REGISTRY_STORAGE_S3_REGION
+              value: hel1
+            - name: REGISTRY_STORAGE_S3_REGIONENDPOINT
+              value: https://hel1.your-objectstorage.com
+            # Required alongside regionendpoint since distribution v3.
+            - name: REGISTRY_STORAGE_S3_FORCEPATHSTYLE
+              value: "true"
+            - name: REGISTRY_STORAGE_S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: registry-config
+                  key: bucket
+            - name: REGISTRY_STORAGE_S3_ACCESSKEY
+              valueFrom:
+                secretKeyRef:
+                  name: registry-config
+                  key: access-key
+            - name: REGISTRY_STORAGE_S3_SECRETKEY
+              valueFrom:
+                secretKeyRef:
+                  name: registry-config
+                  key: secret-key
+            # Serve blobs through the registry instead of redirecting clients
+            # to presigned bucket URLs, so build daemons and nodes only ever
+            # talk to registry.trongate.cloud.
+            - name: REGISTRY_STORAGE_REDIRECT_DISABLE
+              value: "true"
+            - name: REGISTRY_STORAGE_DELETE_ENABLED
+              value: "true"
+            # distribution v3 exports traces by default; nothing collects them here.
+            - name: OTEL_TRACES_EXPORTER
+              value: none
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: auth
+              mountPath: /auth
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: auth
+          secret:
+            secretName: registry-config
+            items:
+              - key: htpasswd
+                path: htpasswd
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry
+  namespace: registry
+spec:
+  selector:
+    app.kubernetes.io/name: registry
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: registry
+  namespace: registry
+spec:
+  parentRefs:
+    - name: platform
+      namespace: traefik
+      sectionName: https-registry
+  hostnames:
+    - registry.trongate.cloud
+  rules:
+    - backendRefs:
+        - name: registry
+          port: 80

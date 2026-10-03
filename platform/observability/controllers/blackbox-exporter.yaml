@@ -65,7 +65,10 @@ spec:
     # drain reports that everything it was probing went down. A monitoring
     # component's own unavailability is indistinguishable from an outage unless
     # you make it not happen.
-    replicas: 2
+    #
+    # TRONGATE-CLOUD single-node profile: one replica; on one node the second
+    # shares every failure with the first. Back to 2 with a second node.
+    replicas: 1
     podDisruptionBudget:
       maxUnavailable: 1
 

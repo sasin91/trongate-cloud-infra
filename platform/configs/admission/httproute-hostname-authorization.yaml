@@ -179,3 +179,17 @@ spec:
     namespaceSelector:
       matchLabels:
         platform.example.com/managed: tenant
+      # TRONGATE-CLOUD: trongate.cloud's tenant namespaces (tc-team-*) carry
+      # the tenant label too, so the Gateway's allowedRoutes admits them, but
+      # their hostnames are not a per-namespace annotation: the worker derives
+      # them ({slug}.apps.trongate.cloud plus DNS-verified custom domains) and
+      # its own policy, trongate-worker-objects in trongate.cloud's
+      # deploy/k8s/platform/worker-admission-policy.yaml, is what forbids
+      # platform hostnames. Without this exclusion every tenant route is
+      # refused for lacking the platform.example.com/domains annotation.
+      # Namespaces the worker creates are labelled
+      # app.kubernetes.io/managed-by=trongate-cloud (Manifests::_labels).
+      matchExpressions:
+        - key: app.kubernetes.io/managed-by
+          operator: NotIn
+          values: ["trongate-cloud"]

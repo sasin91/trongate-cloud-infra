@@ -4,6 +4,14 @@
 # in this repository is protected by.
 *.tfvars
 !*.tfvars.example
+# TRONGATE-CLOUD: the profile file holds shape only, never credentials.
+!infrastructure/hetzner/trongate-cloud.auto.tfvars
+# Partial backend config (bucket names and endpoint); the example is committed.
+backend.hcl
+# Flux's read-only deploy keys, created next to the repo by TRONGATE-CLOUD.md 5.2.
+/infra-deploy-key*
+/trongate-cloud-deploy-key*
+/known_hosts
 
 # State should never be local. If these appear, the backend is not configured,
 # and a configuration that cannot manage what it built is worse than none.

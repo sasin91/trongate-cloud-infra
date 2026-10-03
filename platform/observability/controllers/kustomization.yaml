@@ -20,8 +20,14 @@ resources:
   - sources.yaml
   - victoria-metrics-k8s-stack.yaml
   - victoria-logs.yaml
-  - otel-collector.yaml
-  - tempo.yaml
+  # TRONGATE-CLOUD single-node profile: no trace pipeline. Tempo (512Mi-2Gi and
+  # a 20Gi volume) and the collector (192Mi-512Mi) are the least-used third of
+  # the stack on a cluster whose only spans would come from the ingress.
+  # Metrics, logs, alerting and Grafana stay. To restore: uncomment both,
+  # restore Traefik's tracing block (platform/controllers/releases/
+  # ingress.yaml), the Tempo datasource, scrape and probe target.
+  # - otel-collector.yaml
+  # - tempo.yaml
   - blackbox-exporter.yaml
   # A directory, not a file. kustomize refuses to load a file from outside its
   # own directory; a sibling directory with its own kustomization is fine.

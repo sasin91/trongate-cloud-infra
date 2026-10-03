@@ -24,14 +24,15 @@ creation_rules:
   # a file is encrypted without opening it, and how a reviewer notices a secret
   # that is not.
   # ---------------------------------------------------------------------------
-  - path_regex: (^|/)(clusters|infrastructure|platform|observability|tenants)/.*\.sops\.ya?ml$
+  # TRONGATE-CLOUD: apps/ added (apps/trongate-cloud/{secrets,registry}).
+  - path_regex: (^|/)(apps|clusters|infrastructure|platform|observability|tenants)/.*\.sops\.ya?ml$
     # Encrypt the values, leave the structure readable. Without this, the whole
     # document is ciphertext and a review cannot tell a renamed key from a
     # rotated password. With it, a diff shows which secret changed and in which
     # namespace, and shows nothing of what it changed to.
     encrypted_regex: ^(data|stringData)$
     age: >-
-      age1PLACEHOLDERREPLACEWITHYOUROWNAGEPUBLICKEYFROMAGEKEYGENXXXX
+      age1eyp26flc48tlgy32tmawjjvut92skkts9y3qycwtqpgqyunmu4zqjchqz6
 
   # ---------------------------------------------------------------------------
   # Catch-all, deliberately last: any other file following the convention is
@@ -42,7 +43,7 @@ creation_rules:
   - path_regex: \.sops\.ya?ml$
     encrypted_regex: ^(data|stringData)$
     age: >-
-      age1PLACEHOLDERREPLACEWITHYOUROWNAGEPUBLICKEYFROMAGEKEYGENXXXX
+      age1eyp26flc48tlgy32tmawjjvut92skkts9y3qycwtqpgqyunmu4zqjchqz6
 
 # =============================================================================
 # THE KEY ABOVE IS A PLACEHOLDER. IT IS NOT A VALID age RECIPIENT.

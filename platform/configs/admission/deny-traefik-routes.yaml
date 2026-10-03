@@ -1,0 +1,39 @@
+---
+# TRONGATE-CLOUD: no IngressRoute, anywhere.
+#
+# Traefik's kubernetesCRD provider is enabled (platform/controllers/releases/
+# ingress.yaml) for exactly one reason: a Gateway API ExtensionRef filter can
+# only reference a traefik.io Middleware when it is, and trongate.cloud's
+# scale-to-zero is a Sablier Middleware. The provider also serves IngressRoute,
+# IngressRouteTCP and IngressRouteUDP, each a way to claim a hostname that the
+# HTTPRoute admission policies never see. Refusing them keeps HTTPRoute the only
+# route source, which is the property the kit's ingress decision rests on.
+#
+# Middleware, TLSOption, ServersTransport and the other traefik.io kinds stay
+# allowed; they attach to nothing on their own.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: deny-traefik-routes
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["traefik.io", "traefik.containo.us"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["ingressroutes", "ingressroutetcps", "ingressrouteudps"]
+  validations:
+    - expression: "false"
+      reason: Forbidden
+      message: >-
+        IngressRoute kinds are disabled on this cluster. Use an HTTPRoute on the
+        platform Gateway; Traefik's CRD provider is on only for Middlewares.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: deny-traefik-routes
+spec:
+  policyName: deny-traefik-routes
+  validationActions: [Deny]

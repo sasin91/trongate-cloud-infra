@@ -1,0 +1,194 @@
+# TRONGATE-CLOUD: trongate.cloud's platform, beside the kit's four layers.
+#
+# deploy/k8s/README.md's bootstrap order, as dependsOn edges:
+#
+#   infrastructure ─→ trongate-cloud-operators ─┬─→ trongate-cloud-secrets
+#                                               └─→ trongate-cloud ←─ platform
+#   platform ─→ trongate-cloud-registry
+#
+#   1. Operators   mariadb-operator (+CRDs) and the JuiceFS CSI driver, kept in
+#                  this repository (apps/trongate-cloud/operators says why).
+#   2. Secrets     SOPS-encrypted, also in this repository.
+#   3. Platform    ./deploy/k8s from trongate.cloud's own repository, which
+#                  needs the operators' CRDs and the kit's Gateway, issuers and
+#                  admission policy (the `platform` layer).
+#   4. Schema      by hand, once MariaDB `platform` is Ready (TRONGATE-CLOUD.md).
+#
+# The registry needs only the Gateway, so it hangs off `platform` directly.
+#
+# ROOT TIMEOUT. The root Kustomization (flux-system/gotk-sync.yaml, 45m) waits
+# for these too. The longest chain through them is infrastructure 10m +
+# operators 10m + trongate-cloud 15m = 35m, inside the kit's 40m sum, so the
+# root's timeout does not change.
+#
+# Every Kustomization names kustomize-controller: the kit's lockdown gives one
+# that names none a powerless identity.
+---
+# trongate.cloud's repository. A second source beside flux-system, in the same
+# namespace, so --no-cross-namespace-refs is satisfied.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: trongate-cloud
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  timeout: 60s
+  ref:
+    branch: main
+  # PRIVATE REPOSITORY: a read-only deploy key on sasin91/trongate.cloud, as a
+  # hand-created Secret (the same exception the kit names for a private fork;
+  # see clusters/README.md and TRONGATE-CLOUD.md for the command).
+  url: ssh://git@github.com/sasin91/trongate.cloud.git
+  secretRef:
+    name: trongate-cloud-deploy-key
+  # Only the cluster manifests. The application source never reaches the
+  # cluster this way, and a change elsewhere in that repository produces no new
+  # artifact and no reconcile.
+  ignore: |
+    /*
+    !/deploy/k8s/
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: trongate-cloud-operators
+  namespace: flux-system
+spec:
+  # cert-manager must be up: the JuiceFS chart's webhook takes its certificate
+  # from it.
+  dependsOn:
+    - name: infrastructure
+  serviceAccountName: kustomize-controller
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./apps/trongate-cloud/operators
+  interval: 30m0s
+  retryInterval: 2m0s
+  prune: true
+  wait: true
+  timeout: 10m0s
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: trongate-cloud-secrets
+  namespace: flux-system
+spec:
+  # Not dependsOn trongate-cloud, which cannot be Ready without these; see the
+  # ordering note in apps/trongate-cloud/secrets/kustomization.yaml.
+  dependsOn:
+    - name: trongate-cloud-operators
+  serviceAccountName: kustomize-controller
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./apps/trongate-cloud/secrets
+  interval: 30m0s
+  # Short, because on a first install the target namespaces appear a few
+  # seconds after this first runs.
+  retryInterval: 1m0s
+  prune: true
+  wait: true
+  timeout: 2m0s
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: trongate-cloud
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: trongate-cloud-operators
+    # The Gateway, the DNS-01 issuers and the admission policies.
+    - name: platform
+  serviceAccountName: kustomize-controller
+  sourceRef:
+    kind: GitRepository
+    name: trongate-cloud
+  path: ./deploy/k8s
+  interval: 10m0s
+  retryInterval: 2m0s
+  prune: true
+  wait: true
+  # Two MariaDB instances, Valkey and the app all pull images and bind
+  # volumes on a cold node.
+  timeout: 15m0s
+  # deploy/k8s/README.md asks for it; nothing in that path is encrypted today
+  # (the Secrets live in trongate-cloud-secrets), so this only matters if a
+  # .sops.yaml file is ever added there.
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  # No postBuild substitution: files/storageclass.yaml carries ${...} in its
+  # pathPattern (README step 3).
+  #
+  # Cluster-specific adjustments, made here so trongate.cloud's repository
+  # stays cluster-agnostic. Each is small; move it upstream if it should be the
+  # app's default.
+  patches:
+    # The kit's Gateway is traefik/platform, not traefik/traefik-gateway. The
+    # worker reads this when it writes tenant HTTPRoutes.
+    - target:
+        kind: ConfigMap
+        name: trongate-cloud
+        namespace: trongate-cloud
+      patch: |
+        - op: replace
+          path: /data/PLATFORM_GATEWAY_NAME
+          value: platform
+    # The control panel's own route: same Gateway, and pinned to the listener
+    # that serves trongate.cloud.
+    - target:
+        group: gateway.networking.k8s.io
+        kind: HTTPRoute
+        name: trongate-cloud-app
+        namespace: trongate-cloud
+      patch: |
+        - op: replace
+          path: /spec/parentRefs/0/name
+          value: platform
+        - op: add
+          path: /spec/parentRefs/0/sectionName
+          value: https-platform
+    # Cost: 20Gi instead of 50Gi for shared-1 (EUR 1.14 vs 2.86/month). The
+    # hcloud-volumes class allows expansion, so this grows in place when
+    # tenant databases and JuiceFS metadata need it.
+    - target:
+        group: k8s.mariadb.com
+        kind: MariaDB
+        name: shared-1
+        namespace: databases
+      patch: |
+        - op: replace
+          path: /spec/storage/size
+          value: 20Gi
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: trongate-cloud-registry
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: platform
+  serviceAccountName: kustomize-controller
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./apps/trongate-cloud/registry
+  interval: 30m0s
+  retryInterval: 2m0s
+  prune: true
+  wait: true
+  timeout: 5m0s
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

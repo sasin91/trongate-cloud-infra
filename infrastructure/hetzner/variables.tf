@@ -174,6 +174,59 @@ variable "agent_server_type" {
   default     = "cpx32"
 }
 
+# ---------------------------------------------------------------------------
+# TRONGATE-CLOUD: profile switches. Defaults reproduce the kit; the values for
+# the single-node trongate.cloud cluster are in trongate-cloud.auto.tfvars.
+# ---------------------------------------------------------------------------
+
+variable "enabled_architectures" {
+  description = "CPU architectures the module may provision: [\"x86\"] (the kit's default) or [\"arm\"] for CAX types. Every nodepool must match."
+  type        = list(string)
+  default     = ["x86"]
+}
+
+variable "control_plane_count" {
+  description = "Control plane nodes: 1 (non-HA) or 3. Never 2, and never shrink a running cluster -- see main.tf."
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = contains([1, 3, 5], var.control_plane_count)
+    error_message = "control_plane_count must be 1, 3 or 5 (an odd etcd quorum)."
+  }
+}
+
+variable "allow_scheduling_on_control_plane" {
+  description = "Let workloads run on control plane nodes. Required when agent_count is 0."
+  type        = bool
+  default     = false
+}
+
+variable "enable_klipper_lb" {
+  description = "Serve LoadBalancer Services from the nodes' own IPs (k3s servicelb) instead of a Hetzner load balancer."
+  type        = bool
+  default     = false
+}
+
+variable "automatically_upgrade_os" {
+  description = "Unattended OS updates with kured reboots. kube-hetzner advises false for single-node clusters."
+  type        = bool
+  default     = true
+}
+
+variable "registries_config" {
+  description = <<-EOT
+    k3s registries.yaml contents, written to every node. Carries the pull-only
+    credential for the platform registry, so supply it from the environment
+    (TF_VAR_registries_config) or the gitignored terraform.tfvars, never from a
+    committed file. See TRONGATE-CLOUD.md for the shape. The module pushes a
+    changed value to existing nodes over SSH on the next apply.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = " "
+}
+
 variable "agent_count" {
   description = "Fixed agent nodes. These carry the workloads the autoscaler is not allowed to take away — ingress, storage, anything with a disruption budget."
   type        = number

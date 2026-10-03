@@ -1,0 +1,25 @@
+---
+# TRONGATE-CLOUD: the operators trongate.cloud's deploy/k8s needs, in the kit's
+# shape.
+#
+# WHY THESE ARE HERE AND NOT trongate.cloud's deploy/k8s/operators. That
+# directory is correct on its own but cannot run under this kit's Flux lockdown:
+#
+#   - its HelmReleases name no service account, and --default-service-account
+#     makes them reconcile as a powerless `default` account (the failure the
+#     kit's own releases document);
+#   - they live in kube-system and mariadb-operator, while helm-controller's
+#     account lives in flux-system and --no-cross-namespace-refs forbids
+#     pointing elsewhere;
+#   - they pin ranges (26.10.x, 0.33.x), which scripts/checks/check-version-pins.py
+#     refuses.
+#
+# deploy/k8s/README.md allows exactly this ("skip what the platform kit
+# already installs"). Keep the VALUES in step with that directory when it
+# changes; the versions are pinned here on purpose.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - sources.yaml
+  - mariadb-operator.yaml
+  - juicefs-csi.yaml

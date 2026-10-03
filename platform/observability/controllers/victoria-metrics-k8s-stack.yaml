@@ -111,29 +111,32 @@ spec:
       route:
         enabled: false
       spec:
-        retentionPeriod: "30d"
+        # TRONGATE-CLOUD single-node profile: 15 days on a 10Gi volume
+        # (EUR 0.57/month) instead of 30 days on 50Gi. Watch
+        # vm_data_size_bytes and grow the volume, not the guess.
+        retentionPeriod: "15d"
         replicaCount: 1
         extraArgs:
           # When the disk fills, go read-only instead of dying. A metrics
           # database that stops accepting writes is a bad afternoon; one that
           # corrupts its index is a worse week.
-          storage.minFreeDiskSpaceBytes: "5GB"
+          storage.minFreeDiskSpaceBytes: "1GB"
         storage:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 50Gi
+              storage: 10Gi
           # storageClassName is deliberately unset. This layer does not
           # hardcode a class name owned by another layer. If you want these
           # volumes to survive a namespace deletion, point it at the retaining
           # class rather than the deleting default.
         resources:
           requests:
-            cpu: 200m
-            memory: 1Gi
+            cpu: 100m
+            memory: 512Mi
           limits:
-            memory: 3Gi
+            memory: 1536Mi
 
     # ------------------------------------------------------------------
     # Scrape
@@ -336,14 +339,17 @@ spec:
           # VictoriaLogs runs from its own chart (./victoria-logs.yaml), so the
           # stack is told where it is rather than deploying a second copy.
           url: http://victoria-logs-single-server.observability.svc:9428
-    defaultDatasources:
-      extra:
-        - name: Tempo
-          uid: Tempo
-          type: tempo
-          access: proxy
-          url: http://tempo.observability.svc:3200
-          isDefault: false
+    # TRONGATE-CLOUD: no Tempo datasource while Tempo is not installed (see
+    # ./kustomization.yaml). Restore with it:
+    #
+    # defaultDatasources:
+    #   extra:
+    #     - name: Tempo
+    #       uid: Tempo
+    #       type: tempo
+    #       access: proxy
+    #       url: http://tempo.observability.svc:3200
+    #       isDefault: false
 
     # ------------------------------------------------------------------
     # Kubernetes component scrapes — k3s reality, not upstream defaults

@@ -21,6 +21,7 @@ SEVERITY:
 """
 
 import os
+import re
 import sys
 
 sys.dont_write_bytecode = True  # no __pycache__ in a repository that does not ignore it
@@ -28,6 +29,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _common as c  # noqa: E402
 
 LESSON = "when you remove a cause, go and hunt its effects -- the ingress kept both"
+
+# TRONGATE-CLOUD: a single-node cluster cannot hold two ingress replicas. A
+# comment "# ingress-ha waiver: <reason>" in the declaring file downgrades the
+# replica and disruption-budget findings from boundary to report -- the same
+# recorded-reason pattern check-prune-enabled.py uses. Remove the waiver when
+# the second node arrives.
+WAIVER = re.compile(r"#\s*ingress-ha waiver:\s*\S")
 
 REPLICA_KEYS = ("replicas", "replicaCount")
 PDB_KEYS = ("podDisruptionBudget", "poddisruptionbudget", "pdb")
@@ -106,6 +114,10 @@ def body(check):
 
     for parsed, doc in ingress_docs:
         name = c.name_of(doc) or "<unnamed>"
+        waived = bool(WAIVER.search(parsed.text))
+        flag = check.report if waived else check.boundary
+        if waived:
+            check.note("%s carries a recorded ingress-ha waiver; replica and PDB findings report only" % name)
         kind = c.kind_of(doc)
         node = c.helm_values(doc) if kind in ("HelmRelease", "HelmChartConfig") else doc
         if kind == "HelmChartConfig":
@@ -126,14 +138,14 @@ def body(check):
         else:
             dotted, count = first_number(node, REPLICA_KEYS)
             if count is None:
-                check.boundary(
+                flag(
                     "%s declares no replica count; every common ingress chart defaults to one"
                     % name,
                     parsed.path,
                     parsed.line_of("spec"),
                 )
             elif count < 2:
-                check.boundary(
+                flag(
                     "%s declares %s = %d; the ingress terminates every connection passing "
                     "through it" % (name, dotted, count),
                     parsed.path,
@@ -149,7 +161,7 @@ def body(check):
             ]
             declared = bool(related)
         if not declared:
-            check.boundary(
+            flag(
                 "%s has no PodDisruptionBudget; an unattended-upgrade node drain evicts it "
                 "without one" % name,
                 parsed.path,

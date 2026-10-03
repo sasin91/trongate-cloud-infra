@@ -53,10 +53,13 @@ spec:
     # nodes get drained for unattended patching, and an aggregated API service
     # with no backend makes every `kubectl top` and every autoscaling decision
     # fail rather than degrade.
-    replicas: 2
+    #
+    # TRONGATE-CLOUD single-node profile: one replica, no budget (a budget of 1
+    # over 1 replica blocks every drain). Back to 2 + minAvailable 1 with a
+    # second node.
+    replicas: 1
     podDisruptionBudget:
-      enabled: true
-      minAvailable: 1
+      enabled: false
 
     # NO `--kubelet-insecure-tls`.
     #

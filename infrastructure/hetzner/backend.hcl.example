@@ -1,0 +1,10 @@
+# TRONGATE-CLOUD: partial backend configuration (see README.md, step 3).
+#
+#   cp backend.hcl.example backend.hcl     # gitignored (*.hcl below the example)
+#   tofu init -backend-config=backend.hcl
+#
+# Values here override the PLACEHOLDER lines in versions.tf. Bucket names are
+# global across Hetzner Object Storage customers; pick another if taken.
+bucket    = "trongate-cloud-tofu-state"
+region    = "hel1"
+endpoints = { s3 = "https://hel1.your-objectstorage.com" }

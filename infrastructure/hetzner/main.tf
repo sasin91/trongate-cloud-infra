@@ -141,7 +141,12 @@ module "kube_hetzner" {
   #
   # Platform components stay multi-architecture because that costs nothing; this
   # setting is about what the kit will provision, not what it can run.
-  enabled_architectures = ["x86"]
+  #
+  # TRONGATE-CLOUD: a variable so a profile can choose arm (CAX). The default is
+  # still the kit's ["x86"]; trongate-cloud.auto.tfvars sets ["arm"], and every
+  # nodepool, autoscaler pools included, must then be a CAX type. Observed
+  # 2026-10-03: cax21/31/41 available in fsn1, nbg1 and hel1.
+  enabled_architectures = var.enabled_architectures
 
   network_region = var.network_region
 
@@ -167,9 +172,37 @@ module "kube_hetzner" {
       location    = var.control_plane_location
       labels      = []
       taints      = []
-      count       = 3
+      # TRONGATE-CLOUD: a variable, default 3 (the kit's value). The single-node
+      # profile sets 1. Growing 1 -> 3 later is safe; shrinking is not (above).
+      count = var.control_plane_count
     }
   ]
+
+  # TRONGATE-CLOUD: single-node profile switches. Defaults keep the kit's shape.
+  #
+  # allow_scheduling_on_control_plane: with agent_count = 0 the control plane is
+  # the only place workloads can run.
+  #
+  # enable_klipper_metal_lb: Traefik's LoadBalancer Service is served by k3s
+  # servicelb on the node's own IPv4 (the module then opens 80/443 in the
+  # firewall) and the cloud controller stops creating Hetzner load balancers
+  # (HCLOUD_LOAD_BALANCERS_ENABLED=false). kube-hetzner only does this by itself
+  # when control planes + agents + autoscaler max add up to exactly 1, and the
+  # 0-1 autoscaler pool makes it 2, so it is set explicitly. Moving to a Hetzner
+  # LB later is this flag plus the annotations in
+  # platform/controllers/releases/ingress.yaml (see TRONGATE-CLOUD.md).
+  allow_scheduling_on_control_plane = var.allow_scheduling_on_control_plane
+  enable_klipper_metal_lb           = var.enable_klipper_lb
+
+  # kube-hetzner: "Should be disabled for single-node clusters" (attached volumes
+  # and unattended reboots do not mix). The single-node profile turns it off and
+  # patches the OS by hand on a schedule; see TRONGATE-CLOUD.md.
+  automatically_upgrade_os = var.automatically_upgrade_os
+
+  # TRONGATE-CLOUD: k3s registries.yaml. Nodes pull tenant images from the
+  # platform registry (registry.trongate.cloud) with a pull-only credential, so
+  # tenant namespaces need no imagePullSecrets. Empty by default.
+  registries_config = var.registries_config
 
   # ---------------------------------------------------------------------------
   # Agents: a small fixed pool for everything that must not move.

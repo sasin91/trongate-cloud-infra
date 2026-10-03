@@ -1,0 +1,10 @@
+---
+# The Gateway's https-registry listener admits routes from this namespace by
+# name (kubernetes.io/metadata.name: registry).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: registry
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

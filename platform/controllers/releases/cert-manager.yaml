@@ -77,30 +77,24 @@ spec:
       # every certificate in the cluster disappearing at once.
       keep: true
 
-    # More than one replica of the controller, and a budget so a node drain
-    # cannot take the last one. The cluster applies unattended operating-system
-    # updates and drains nodes to do it; a workload with no disruption budget is
-    # evicted with no guarantee at all. cert-manager elects a leader, so the
-    # second replica is availability, not throughput.
-    replicaCount: 2
+    # TRONGATE-CLOUD single-node profile: one replica of each, no budgets. On
+    # one node a second replica adds memory but no availability, and a budget
+    # of minAvailable 1 over one replica blocks every drain. With a second node,
+    # restore the kit's values: replicaCount 2 and the podDisruptionBudget
+    # blocks (minAvailable 1) for the controller, webhook and cainjector.
+    replicaCount: 1
     podDisruptionBudget:
-      enabled: true
-      minAvailable: 1
+      enabled: false
 
     webhook:
-      # The webhook is in the admission path for every Certificate and Issuer
-      # write. If it is unavailable those writes fail, so it gets the same
-      # treatment as the controller.
-      replicaCount: 2
+      replicaCount: 1
       podDisruptionBudget:
-        enabled: true
-        minAvailable: 1
+        enabled: false
 
     cainjector:
-      replicaCount: 2
+      replicaCount: 1
       podDisruptionBudget:
-        enabled: true
-        minAvailable: 1
+        enabled: false
 
     config:
       apiVersion: controller.config.cert-manager.io/v1alpha1

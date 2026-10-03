@@ -37,7 +37,8 @@ spec:
         - http://vmsingle-victoria-metrics-k8s-stack.observability.svc:8428/health
         - http://vmalert-victoria-metrics-k8s-stack.observability.svc:8080/health
         - http://victoria-logs-single-server.observability.svc:9428/health
-        - http://tempo.observability.svc:3200/ready
+        # TRONGATE-CLOUD: Tempo is not installed in the single-node profile.
+        # - http://tempo.observability.svc:3200/ready
         - http://victoria-metrics-k8s-stack-grafana.observability.svc:80/api/health
       labels:
         probe_scope: internal
