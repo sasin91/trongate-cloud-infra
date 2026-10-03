@@ -278,9 +278,7 @@ cd infrastructure/hetzner
 cp backend.hcl.example backend.hcl
 tofu init -backend-config=backend.hcl
 python ../../scripts/checks/check-fetched-module-line-endings.py
-# check-pool-availability.py currently fails: Hetzner removed /v1/datacenters
-# (HTTP 410). Until the kit is fixed, read availability from
-# `hcloud server-type describe cax31 -o json` (locations[].available).
+python ../../scripts/checks/check-pool-availability.py   # needs HCLOUD_TOKEN
 # ARM snapshot, about 5 minutes on a temporary server. The template pins
 # Packer to exactly 1.16.0 (winget installs newer; use the release zip):
 packer init  .terraform/modules/kube_hetzner/packer-template/hcloud-leapmicro-snapshots.pkr.hcl

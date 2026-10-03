@@ -276,19 +276,24 @@ def body(check):
         return
     check.note("using a provider API token from $%s (read-only is sufficient)" % source)
 
-    datacenters = api_get("/datacenters", secret)
+    # Availability per location comes from the server types themselves:
+    # each lists `locations[]` with an `available` flag. The provider retired
+    # /v1/datacenters (HTTP 410 since 2026), which is where this check used to
+    # read `server_types.available` / `.supported`. A location present in a
+    # type's list is "supported"; `available` is the stock flag.
     server_types = api_get("/server_types", secret)
+    locations = {item["name"].lower() for item in api_get("/locations", secret)}
 
-    by_id = {item["id"]: item for item in server_types}
     by_name = {item["name"].lower(): item for item in server_types}
 
-    available = {}
-    supported = {}
-    for datacenter in datacenters:
-        location = (datacenter.get("location") or {}).get("name", "")
-        types = datacenter.get("server_types") or {}
-        available.setdefault(location, set()).update(types.get("available") or [])
-        supported.setdefault(location, set()).update(types.get("supported") or [])
+    available = {location: set() for location in locations}
+    supported = {location: set() for location in locations}
+    for server_type in server_types:
+        for entry in server_type.get("locations") or []:
+            location = str(entry.get("name", "")).lower()
+            supported.setdefault(location, set()).add(server_type["id"])
+            if entry.get("available"):
+                available.setdefault(location, set()).add(server_type["id"])
 
     for pool in pools:
         label = "%s pool %r" % (pool["list"], pool["name"])
