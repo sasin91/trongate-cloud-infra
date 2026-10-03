@@ -96,7 +96,11 @@ while IFS= read -r file; do
     built=$((built + 1))
 
     if [ -n "$VALIDATE" ]; then
-        if ! $VALIDATE - <"$tmp" >"$tmp.err" 2>&1; then
+        # SOPS-encrypted files carry a top-level `sops:` metadata block that
+        # kustomize-controller strips while decrypting. It is not part of any
+        # Kubernetes schema, so -strict rejects every encrypted Secret unless
+        # it is removed here first, the same way the cluster sees it.
+        if ! awk '/^sops:/ { skip = 1; next } skip && /^[^ ]/ { skip = 0 } !skip' "$tmp"             | $VALIDATE - >"$tmp.err" 2>&1; then
             fail "$rel builds but does not validate: $(tr '\n' ' ' <"$tmp.err" | cut -c1-400)"
         fi
     fi
