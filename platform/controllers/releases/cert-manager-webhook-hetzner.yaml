@@ -1,0 +1,77 @@
+---
+# TRONGATE-CLOUD: DNS-01 solver for Hetzner DNS.
+#
+# Customer apps live at {slug}.trongate.dev, served by one wildcard
+# certificate, and a wildcard can only be issued over DNS-01. trongate.dev's
+# zone is hosted in Hetzner DNS (Porkbun stays the registrar and delegates the
+# nameservers); cert-manager has no built-in solver for it, so this is
+# Hetzner's own webhook (github.com/hetzner/cert-manager-webhook-hetzner, Cloud
+# API zones). trongate.cloud itself stays at Porkbun and uses HTTP-01.
+#
+# The token is the trongate-cloud project's Cloud API token. That is
+# project-wide, servers included, but the cluster already holds the same
+# token for the cloud controller, CSI driver and autoscaler, so this adds no
+# new power to the cluster.
+#
+# Upstream marks the project "maturity: experiment". It is the only maintained
+# solver for the Cloud DNS API.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: hcloud
+  namespace: flux-system
+spec:
+  type: default
+  url: https://charts.hetzner.cloud
+  interval: 24h
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cert-manager-webhook-hetzner
+  namespace: flux-system
+spec:
+  # Required by --default-service-account=default; see cert-manager.yaml.
+  serviceAccountName: helm-controller
+  interval: 12h
+  releaseName: cert-manager-webhook-hetzner
+  # Beside cert-manager: the chart grants cert-manager's service account access
+  # to the solver API, and a ClusterIssuer's token Secret must live in
+  # cert-manager's cluster resource namespace, which is this one.
+  targetNamespace: cert-manager
+  storageNamespace: cert-manager
+  # The chart registers an APIService that cert-manager calls; installing it
+  # before cert-manager's own release is healthy only produces retries.
+  dependsOn:
+    - name: cert-manager
+  chart:
+    spec:
+      chart: cert-manager-webhook-hetzner
+      # 0.9.0 (image hetzner/cert-manager-webhook-hetzner:v0.9.0, amd64+arm64)
+      # -- latest in https://charts.hetzner.cloud/index.yaml on 2026-10-03.
+      version: 0.9.0
+      sourceRef:
+        kind: HelmRepository
+        name: hcloud
+        namespace: flux-system
+      interval: 24h
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  driftDetection:
+    mode: enabled
+  values:
+    # Referenced as groupName by the DNS-01 solver in cluster-issuers.yaml.
+    groupName: acme.hetzner.com
+    replicaCount: 1
+    # The chart's default pod and container security contexts are the
+    # restricted profile, which the cert-manager namespace enforces.
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 128Mi

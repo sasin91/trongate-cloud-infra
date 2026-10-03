@@ -14,8 +14,10 @@ resources:
   # Needs cert-manager's definitions and its webhook to be answering.
   # Needs the Gateway API definitions and the GatewayClass the ingress creates.
   - gateway.yaml
-  # TRONGATE-CLOUD: the HTTP-01 issuers the Gateway's listeners name.
+  # TRONGATE-CLOUD: the issuers the Gateway's listeners name (HTTP-01, plus
+  # DNS-01 for *.trongate.dev), and the encrypted DNS token they read.
   - cluster-issuers.yaml
+  - secrets
   # Needs the Plan definition from platform/controllers/crds/.
   - k3s-upgrade-plans.yaml
   # These two need nothing but the API server. They live here anyway, because

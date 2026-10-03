@@ -38,8 +38,8 @@ metadata:
     # domain is spent by failed attempts too, and a hostname that does not
     # resolve yet fails in a loop that looks like patience.
     #
-    # TRONGATE-CLOUD: HTTP-01 issuers (cluster-issuers.yaml). Staging first,
-    # then letsencrypt.
+    # TRONGATE-CLOUD: cluster-issuers.yaml (HTTP-01, DNS-01 for *.trongate.dev).
+    # Staging first, then letsencrypt.
     cert-manager.io/cluster-issuer: letsencrypt-staging
 spec:
   gatewayClassName: traefik
@@ -69,7 +69,7 @@ spec:
     #
     #   https-platform  trongate.cloud            the control panel only
     #   https-registry  registry.trongate.cloud   the image registry only
-    #   https-apps      *.apps.trongate.cloud     tenant namespaces only
+    #   https-apps      *.trongate.dev            tenant namespaces only
     #
     # Tenant HTTPRoutes from trongate.cloud's worker name the Gateway without a
     # sectionName, so they are offered to every listener and attach only where
@@ -111,31 +111,29 @@ spec:
           selector:
             matchLabels:
               kubernetes.io/metadata.name: registry
-    # https-apps is OFF until the wildcard has a DNS-01 route. DNS for
-    # trongate.cloud is at Porkbun, which cert-manager has no solver for, and
-    # *.apps.trongate.cloud cannot be issued over HTTP-01. A listener whose
-    # certificate never appears makes the whole Gateway invalid and stalls the
-    # platform layer, so it stays commented. Until then tenant routes attach
-    # nowhere. See TRONGATE-CLOUD.md, open items.
-    # - name: https-apps
-    #   protocol: HTTPS
-    #   port: 8443
-    #   hostname: "*.apps.trongate.cloud"
-    #   tls:
-    #     mode: Terminate
-    #     certificateRefs:
-    #       - name: apps-trongate-cloud-wildcard-tls
-    #         kind: Secret
-    #         group: ""
-    #   allowedRoutes:
-    #     namespaces:
-    #       # The tenant label trongate.cloud's worker writes on tc-team-*
-    #       # namespaces (Manifests::tenant), the same one the kit's template
-    #       # uses.
-    #       from: Selector
-    #       selector:
-    #         matchLabels:
-    #           platform.example.com/managed: tenant
+    - name: https-apps
+      protocol: HTTPS
+      port: 8443
+      # Customer apps live on their own registrable domain, not under
+      # trongate.cloud, so an app can never set cookies the control panel
+      # receives (decided 2026-10-03). Certificate over DNS-01, see
+      # cluster-issuers.yaml.
+      hostname: "*.trongate.dev"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: trongate-dev-wildcard-tls
+            kind: Secret
+            group: ""
+      allowedRoutes:
+        namespaces:
+          # The tenant label trongate.cloud's worker writes on tc-team-*
+          # namespaces (Manifests::tenant), the same one the kit's template
+          # uses.
+          from: Selector
+          selector:
+            matchLabels:
+              platform.example.com/managed: tenant
 
     # -----------------------------------------------------------------------
     # Port 443.

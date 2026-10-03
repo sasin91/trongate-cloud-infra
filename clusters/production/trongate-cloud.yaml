@@ -143,6 +143,26 @@ spec:
         - op: replace
           path: /data/PLATFORM_GATEWAY_NAME
           value: platform
+        # Customer apps on their own domain, {slug}.trongate.dev, so they can
+        # never set cookies for trongate.cloud (decided 2026-10-03). Move this
+        # into trongate.cloud's config.yaml and config/platform.php default
+        # once that repository adopts it.
+        - op: replace
+          path: /data/PLATFORM_APPS_DOMAIN
+          value: trongate.dev
+    # Keep the worker's admission policy in step with PLATFORM_APPS_DOMAIN
+    # (variable 2 of trongate-worker-objects is apps_domain).
+    - target:
+        group: admissionregistration.k8s.io
+        kind: ValidatingAdmissionPolicy
+        name: trongate-worker-objects
+      patch: |
+        - op: test
+          path: /spec/variables/2/name
+          value: apps_domain
+        - op: replace
+          path: /spec/variables/2/expression
+          value: "'trongate.dev'"
     # The control panel's own route: same Gateway, and pinned to the listener
     # that serves trongate.cloud.
     - target:

@@ -1,17 +1,21 @@
 ---
-# TRONGATE-CLOUD: the issuers the platform Gateway uses, HTTP-01.
+# TRONGATE-CLOUD: the issuers the platform Gateway uses.
 #
-# The kit keeps these in optional/ because they need an email address and a
-# placeholder one is rejected. Let's Encrypt made the contact optional and
+# Two solvers per issuer, chosen by cert-manager per hostname:
+#
+#   *.trongate.dev    DNS-01 through Hetzner DNS (the customer-app wildcard;
+#                     HTTP-01 cannot issue a wildcard). The zone is hosted in
+#                     Hetzner DNS; see cert-manager-webhook-hetzner.yaml.
+#   everything else   HTTP-01 through the Gateway: trongate.cloud and
+#                     registry.trongate.cloud, whose DNS stays at Porkbun.
+#
+# The kit keeps its issuers in optional/ because they need an email address and
+# a placeholder one is rejected. Let's Encrypt made the contact optional and
 # stopped sending expiry mail in 2025, so these carry none and can live in the
 # default path. Expiry is watched by the observability stack.
 #
-# HTTP-01 covers the exact hostnames: trongate.cloud and
-# registry.trongate.cloud. It cannot cover *.apps.trongate.cloud; that needs a
-# DNS-01 solver for wherever the zone lives (Porkbun today).
-#
-# Start on staging (the Gateway's annotation), switch to letsencrypt once a
-# staging certificate has been issued.
+# Start on staging (the Gateway's annotation), switch to letsencrypt once the
+# staging certificates have been issued.
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -22,6 +26,17 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-staging-account-key
     solvers:
+      - selector:
+          dnsZones:
+            - trongate.dev
+        dns01:
+          webhook:
+            groupName: acme.hetzner.com
+            solverName: hetzner
+            config:
+              tokenSecretKeyRef:
+                name: hetzner-dns-token
+                key: token
       - http01:
           gatewayHTTPRoute:
             parentRefs:
@@ -40,6 +55,17 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-account-key
     solvers:
+      - selector:
+          dnsZones:
+            - trongate.dev
+        dns01:
+          webhook:
+            groupName: acme.hetzner.com
+            solverName: hetzner
+            config:
+              tokenSecretKeyRef:
+                name: hetzner-dns-token
+                key: token
       - http01:
           gatewayHTTPRoute:
             parentRefs:

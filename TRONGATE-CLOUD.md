@@ -24,7 +24,7 @@ from the Hetzner API on 2026-10-03.
 | Autoscaler | cpx32, 0 to 5 | same type as the node, 0 to 1 |
 | Ingress entry | Hetzner lb11 | Traefik on the node's IPv4 through k3s servicelb (klipper), `externalTrafficPolicy: Local` so client IPs are real |
 | Ingress / cert-manager / metrics-server | 2 replicas + PDBs | 1 replica, no PDBs (a PDB of 1 over 1 replica blocks every drain) |
-| Certificates | HTTP-01, HTTPS listener commented | HTTP-01 (no email), listeners for trongate.cloud and registry.trongate.cloud; the *.apps wildcard listener waits for a DNS-01 route (DNS is at Porkbun) |
+| Certificates | HTTP-01, HTTPS listener commented | HTTP-01 (no email) for trongate.cloud and registry.trongate.cloud (DNS at Porkbun); DNS-01 through Hetzner DNS and Hetzner's cert-manager webhook for the customer-app wildcard *.trongate.dev |
 | OS updates | unattended + kured | off, as kube-hetzner advises for one node; patch by hand (section 6) |
 | Observability | VM stack, VictoriaLogs, Tempo, OTel collector, blackbox x2 | VM stack (15d on 10Gi), VictoriaLogs (7d, 8GB on 10Gi), blackbox x1; no Tempo, no collector, Traefik tracing off |
 
@@ -62,7 +62,7 @@ is billed to a private customer in Denmark, add 25 %.
 | Primary IPv4 | one, on the node (IPv6 free) | 0.50 |
 | Block volumes | 60 GB at 0.0572/GB: shared MariaDB 20, platform MariaDB 10, Valkey 10, VictoriaMetrics 10, VictoriaLogs 10 | 3.43 |
 | Object Storage | base price, 1 TB storage + 1 TB egress across all buckets (tofu state, etcd snapshots, JuiceFS, registry, backups). Figure from a July 2026 third-party summary of Hetzner's price list; the API does not expose it, check it in the console | 6.49 |
-| DNS | at Porkbun | 0.00 |
+| DNS | trongate.cloud at Porkbun; trongate.dev zone in Hetzner DNS | 0.00 |
 | OS snapshot | the Leap Micro image the node boots from, about 1-2 GB at 0.0143/GB | 0.03 |
 | **Steady state** | | **~31.44** |
 | x86 alternatives | cx43 (EUR 15.99, out of stock everywhere in the EU on 2026-10-03) would make it ~26.44; cpx42 (EUR 69.49) ~79.94 | |
@@ -156,7 +156,7 @@ platform ─→ trongate-cloud-registry
 The Gateway (`platform/configs/gateway.yaml`) has the kit's HTTP listener plus
 `https-platform` (trongate.cloud, routes from `trongate-cloud` only),
 `https-registry` (registry.trongate.cloud, routes from `registry` only) and
-`https-apps` (`*.apps.trongate.cloud`, routes from namespaces labelled
+`https-apps` (`*.trongate.dev`, routes from namespaces labelled
 `platform.example.com/managed=tenant`, which the worker writes on every
 `tc-team-*`). The `traefik` namespace already carries
 `platform.example.com/role=gateway` from the kit, which trongate.cloud's tenant
@@ -216,10 +216,15 @@ config.
      `trongate-cloud-registry`, `trongate-cloud-backups`.
    Done 2026-10-03: all five exist in hel1, state versioned, snapshots expire
    after 30 days.
-5. **DNS stays at Porkbun** (decided 2026-10-03). Certificates for the exact
-   hostnames come over HTTP-01 and need no DNS credentials. The
-   `*.apps.trongate.cloud` wildcard needs DNS-01, for which cert-manager has no
-   Porkbun solver: that is open item 1 below.
+5. **DNS** (decided 2026-10-03).
+   - `trongate.cloud` stays at Porkbun. Its exact hostnames get certificates
+     over HTTP-01, which needs no DNS credentials.
+   - Customer apps live on their own domain, `{slug}.trongate.dev`, so an app
+     can never set cookies the control panel at trongate.cloud receives.
+     The `*.trongate.dev` wildcard needs DNS-01, so the `trongate.dev` zone is
+     hosted in Hetzner DNS (project Trongate.cloud) and Porkbun, the
+     registrar, delegates to Hetzner's nameservers. The cluster's DNS-01 token
+     is the project token it already holds for the cloud controller.
 6. **SSH key**: generate one locally. Do not upload it to the project; the
    module registers it and fails on a duplicate.
 
@@ -295,9 +300,12 @@ If the platform images stay private on GHCR, add a `ghcr.io` entry with a
 
 ### 5.5 DNS records
 
-At Porkbun, A records pointing at the node's IPv4 (there is no load balancer;
-`tofu output control_planes_public_ipv4`): `trongate.cloud`,
-`registry.trongate.cloud`, and `*.apps.trongate.cloud` once its listener exists. A low TTL (300) until the
+All pointing at the node's IPv4 (there is no load balancer;
+`tofu output control_planes_public_ipv4`):
+
+- Porkbun: `trongate.cloud` and `*.trongate.cloud` (covers `registry`).
+- Hetzner DNS, zone `trongate.dev`: `trongate.dev` (the CNAME target customers
+  use for custom domains) and `*.trongate.dev`. A low TTL (300) until the
 node is final; rebuilding the node changes the address.
 
 ### 5.6 Flux **(the cluster starts pulling and running everything)**
@@ -359,13 +367,12 @@ trongate.cloud's `db/001_*.sql` onwards (not `000`) through a port-forward to
 
 Ranked by how soon they bite.
 
-1. **Tenant apps have no HTTPS yet.** `*.apps.trongate.cloud` needs a wildcard
-   certificate, which only DNS-01 can issue, and DNS is at Porkbun. Options:
-   move the zone's nameservers to Hetzner DNS and use Hetzner's official
-   cert-manager webhook; a community Porkbun webhook with a Porkbun API key; or
-   per-app HTTP-01 certificates and listeners written by the worker. Until one
-   lands, the `https-apps` listener stays commented in
-   `platform/configs/gateway.yaml` and tenant routes attach nowhere.
+1. **trongate.cloud's repository still defaults to `apps.trongate.cloud`.**
+   This cluster sets `PLATFORM_APPS_DOMAIN=trongate.dev` and the worker
+   policy's `apps_domain` through Flux patches
+   (`clusters/production/trongate-cloud.yaml`). Move both into
+   `deploy/k8s/platform/config.yaml`, `worker-admission-policy.yaml`,
+   `config/platform.php` and `.env.example` so the app's defaults match.
 2. **Build pods may not reach the registry.** BuildKit pushes to
    `registry.trongate.cloud`, which resolves to the node's own IP. kube-proxy
    short-cuts a LoadBalancer IP straight to the Traefik pod (10.42.x), and the

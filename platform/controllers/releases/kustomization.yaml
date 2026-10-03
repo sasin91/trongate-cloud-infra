@@ -21,4 +21,6 @@ resources:
   - cert-manager.yaml
   - ingress.yaml
   - metrics-server.yaml
+  # TRONGATE-CLOUD: DNS-01 for the *.trongate.dev customer-app wildcard.
+  - cert-manager-webhook-hetzner.yaml
   - system-upgrade-controller.yaml
