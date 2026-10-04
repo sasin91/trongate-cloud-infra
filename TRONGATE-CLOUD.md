@@ -373,7 +373,10 @@ Ranked by how soon they bite.
    ListenerSet). A domain is routed only once its DNS reaches the load balancer.
    Unverified until the first custom domain is live: Traefik serving several
    Gateways on the same entrypoints, and the challenge route on `acme-http01`
-   winning over the platform Gateway's `http-to-https` route.
+   winning over the platform Gateway's `http-to-https` route. Not done: CAA
+   records for trongate.cloud and trongate.dev with `accounturi` limited to
+   the platform issuers' ACME accounts, so `letsencrypt-tenants` could not get
+   those names even if trongate.cloud's admission policy were bypassed.
 3. **Registry**: no garbage collection yet (needs a read-only window), one
    registry-wide push credential (trongate.cloud's open item), and distribution
    v3's S3 driver against Hetzner Object Storage is untested.

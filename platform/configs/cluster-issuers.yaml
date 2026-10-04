@@ -83,10 +83,16 @@ spec:
 # purpose:
 #
 # - Customers' DNS is theirs, so DNS-01 is not an option.
-# - With no DNS-01 solver this issuer can never issue for *.trongate.dev, so a
-#   tenant Gateway cannot get a certificate for another app's {slug} host
-#   (trongate.cloud's worker-admission-policy.yaml refuses such listeners and
-#   allows no other issuer on tenant Gateways).
+# - With no DNS-01 solver this issuer can never issue the *.trongate.dev
+#   wildcard. It is NOT what keeps tenants off platform names, though:
+#   trongate.cloud and every concrete {slug}.trongate.dev resolve to the same
+#   load balancer and would pass HTTP-01. trongate.cloud's
+#   worker-admission-policy.yaml does that: it refuses tenant listeners for
+#   those hosts, and every cert-manager annotation on tenant Gateways but the
+#   issuer (common-name and friends add names to the certificate). Belt and
+#   braces, not done yet: CAA records for trongate.cloud and trongate.dev with
+#   accounturi limited to the platform issuers' ACME accounts, which this
+#   issuer's account (letsencrypt-tenants-account-key) is not.
 #
 # The challenge route's parentRef has NO namespace, so it lands on the
 # HTTP-only Gateway "acme-http01" in the Certificate's own namespace
