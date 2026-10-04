@@ -129,6 +129,14 @@ spec:
     provider: sops
     secretRef:
       name: sops-age
+  # Platform images from the cluster's own registry, pushed by
+  # bin/push-images.sh. Until trongate.cloud#2 merges, that repository's
+  # kustomization still names ghcr.io; drop this block after the merge.
+  images:
+    - name: ghcr.io/sasin91/trongate-cloud
+      newName: registry.trongate.cloud/platform/trongate-cloud
+    - name: ghcr.io/sasin91/trongate-cloud-worker
+      newName: registry.trongate.cloud/platform/trongate-cloud-worker
   # No postBuild substitution: files/storageclass.yaml carries ${...} in its
   # pathPattern (README step 3).
   #
