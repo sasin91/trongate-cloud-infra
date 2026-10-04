@@ -1,0 +1,17 @@
+---
+# TRONGATE-CLOUD: shared services outrank tenant apps and builds.
+#
+# On 8 GB nodes, memory pressure means the kernel or the kubelet picks pods to
+# kill. Without a priority, a build pod (up to 4 GiB) or a burst of waking apps
+# can take MariaDB or Valkey down, and with them every tenant. The trongate-cloud
+# Kustomization (clusters/production/trongate-cloud.yaml) puts the MariaDBs,
+# Valkey, the app and the worker on this class. Applied here, beside the
+# operators, so it exists before anything that names it.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: trongate-platform
+value: 100000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: trongate.cloud shared services (databases, cache, control panel, worker)

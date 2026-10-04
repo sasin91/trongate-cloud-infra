@@ -5,18 +5,17 @@
 # registries_config come from the environment (TF_VAR_...) or the gitignored
 # terraform.tfvars, exactly as the kit describes.
 #
-# Shape: one cx43 (x86, 8 vCPU / 16 GB / 160 GB, EUR 15.99/month net, hel1)
-# that is both control plane and worker, Traefik on the node's own IPv4 via k3s
-# servicelb (no Hetzner LB), and an autoscaler pool that idles at 0 and may add
-# ONE more cx43 under pressure.
+# Shape: two cx33 (x86, 4 vCPU / 8 GB / 80 GB each, EUR 8.49/month net, hel1):
+# a control plane that also runs workloads and one fixed agent, behind a
+# Hetzner lb11 (EUR 7.49), plus an autoscaler pool that idles at 0 and may add
+# ONE more cx33 under pressure.
 #
-# One architecture, x86 (decided 2026-10-04): customer repos, dev machines and
-# vendored binaries assume it. Observed 2026-10-03/04 in fsn1/nbg1/hel1:
-#   cx43   x86  8 vCPU / 16 GB  EUR 15.99  out of stock   <- this file; wait for it
-#   cpx42  x86  8 vCPU / 16 GB  EUR 69.49  in stock       <- not worth it yet
-#   cax31  arm  8 vCPU / 16 GB  EUR 20.99  out of stock   (arm rejected: one arch)
-# check-pool-availability.py says when cx43 is back. A type change later
-# replaces the server.
+# One architecture, x86 (decided 2026-10-04). Chosen over waiting for cx43
+# (8 vCPU / 16 GB, EUR 15.99, out of stock in every EU location 2026-10-03/04)
+# because cx33 was in stock; same total RAM in two pieces, ~EUR 1.50/month more.
+# Trade-offs accepted 2026-10-04 (TRONGATE-CLOUD.md section 1): the control
+# plane stays a cx33 (changing its type may replace it, and a single etcd
+# member replaced is a rebuild), 80 GB disk per node, volumes attach to one node.
 #
 # Growing out of this, in order of cost:
 #   - autoscaler_max_nodes > 1                     more burst capacity
@@ -30,25 +29,41 @@ network_region = "eu-central"
 enabled_architectures = ["x86"]
 
 control_plane_location            = "hel1"
-control_plane_server_type         = "cx43"
+control_plane_server_type         = "cx33"
 control_plane_count               = 1
 allow_scheduling_on_control_plane = true
 
-# No fixed agents. The type is still declared (and x86) because the module
-# validates every pool's architecture, populated or not.
+# k3s server + etcd measured at ~2.5 GiB outside pods on a kube-hetzner
+# control plane (Scaleweb, 2026-10-04); reserve accordingly so the scheduler
+# does not overcommit the node, and evict before the kernel OOM-kills.
+control_plane_kubelet_args = [
+  "kube-reserved=cpu=250m,memory=2048Mi,ephemeral-storage=1Gi",
+  "system-reserved=cpu=250m,memory=512Mi",
+  "eviction-hard=memory.available<300Mi,nodefs.available<10%",
+]
+
+# One fixed agent: workloads that must not move (MariaDB and Valkey volumes,
+# Traefik's second replica) and the bulk of the apps.
 agent_location    = "hel1"
-agent_server_type = "cx43"
-agent_count       = 0
+agent_server_type = "cx33"
+agent_count       = 1
+agent_kubelet_args = [
+  "kube-reserved=cpu=50m,memory=512Mi,ephemeral-storage=1Gi",
+  "system-reserved=cpu=250m,memory=512Mi",
+  "eviction-hard=memory.available<300Mi,nodefs.available<10%",
+]
 
 autoscaler_location    = "hel1"
-autoscaler_server_type = "cx43"
+autoscaler_server_type = "cx33"
 autoscaler_max_nodes   = 1
 
 # The commented-out fallback pool in main.tf must also be x86 if enabled.
 autoscaler_fallback_location    = "fsn1"
-autoscaler_fallback_server_type = "cx43"
+autoscaler_fallback_server_type = "cx33"
 
-enable_klipper_lb        = true
+# Hetzner lb11 in front (decided 2026-10-04): a stable address that survives
+# node rebuilds, and ingress on both nodes. See ingress.yaml.
+enable_klipper_lb        = false
 automatically_upgrade_os = false
 
 # Object storage in the same location as the node (free internal traffic).

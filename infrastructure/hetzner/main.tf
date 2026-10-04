@@ -174,6 +174,9 @@ module "kube_hetzner" {
       # TRONGATE-CLOUD: a variable, default 3 (the kit's value). The single-node
       # profile sets 1. Growing 1 -> 3 later is safe; shrinking is not (above).
       count = var.control_plane_count
+      # TRONGATE-CLOUD: memory the kubelet keeps back for k3s itself. Default
+      # is the module's own; see variables.tf for why the profile raises it.
+      kubelet_args = var.control_plane_kubelet_args
     }
   ]
 
@@ -227,6 +230,8 @@ module "kube_hetzner" {
       labels      = []
       taints      = []
       count       = var.agent_count
+      # TRONGATE-CLOUD: see control_plane_kubelet_args above.
+      kubelet_args = var.agent_kubelet_args
     }
   ]
 

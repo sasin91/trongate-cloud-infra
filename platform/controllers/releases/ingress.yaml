@@ -96,26 +96,24 @@ spec:
         headers:
           # Headers carry credentials far more often than anyone intends.
           defaultMode: drop
-    # ingress-ha waiver: TRONGATE-CLOUD single-node profile. One node, so a
-    # second replica has nowhere to go and the kit's required anti-affinity
-    # would leave every rolling update Pending. A disruption budget on one
-    # replica blocks every drain. Both come back with the second node: set
-    # replicas to 2, restore the PDB and the anti-affinity below, and remove
-    # this waiver (scripts/checks/check-ingress-ha.py reads it).
+    # TRONGATE-CLOUD: back to the kit's ingress HA now that there are two
+    # nodes and a load balancer (2026-10-04): one replica per node, a
+    # disruption budget, required anti-affinity.
     deployment:
-      replicas: 1
+      replicas: 2
 
     podDisruptionBudget:
-      enabled: false
+      enabled: true
+      minAvailable: 1
 
-    # affinity:
-    #   podAntiAffinity:
-    #     requiredDuringSchedulingIgnoredDuringExecution:
-    #       - labelSelector:
-    #           matchLabels:
-    #             app.kubernetes.io/name: '{{ template "traefik.name" . }}'
-    #             app.kubernetes.io/instance: '{{ .Release.Name }}-{{ include "traefik.namespace" . }}'
-    #         topologyKey: kubernetes.io/hostname
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: '{{ template "traefik.name" . }}'
+                app.kubernetes.io/instance: '{{ .Release.Name }}-{{ include "traefik.namespace" . }}'
+            topologyKey: kubernetes.io/hostname
 
     # TRONGATE-CLOUD: the Sablier plugin. trongate.cloud's worker puts a
     # traefik.io Middleware using it in front of every scale-to-zero app
@@ -200,16 +198,15 @@ spec:
     service:
       spec:
         type: LoadBalancer
-        # TRONGATE-CLOUD: with k3s servicelb (enable_klipper_lb) the node's own
-        # IPv4 is the entry point and Local keeps the client's real address --
-        # no PROXY protocol needed. Back to Cluster (and the PROXY protocol pair
-        # below) when moving to a Hetzner load balancer.
-        externalTrafficPolicy: Local
-      # TRONGATE-CLOUD: INERT while enable_klipper_lb = true -- the cloud
-      # controller runs with HCLOUD_LOAD_BALANCERS_ENABLED=false and creates no
-      # load balancer. Kept, with the location set to the node's, so that moving
-      # to an lb11 (EUR 7.49/month in hel1, 2026-10-03) is flipping
-      # enable_klipper_lb to false plus the two notes above and below.
+        # TRONGATE-CLOUD: Cluster, the kit's behaviour behind a Hetzner load
+        # balancer. Client addresses are not preserved yet: that needs the
+        # PROXY protocol pair below plus the load-balancer.hetzner.cloud/hostname
+        # annotation (otherwise in-cluster clients of the LB address, such as
+        # build pods pushing to registry.trongate.cloud, bypass the balancer and
+        # send no PROXY header). Left for later.
+        externalTrafficPolicy: Cluster
+      # TRONGATE-CLOUD: an lb11 in hel1 (EUR 7.49/month, 2026-10-04), created by
+      # the cloud controller because enable_klipper_lb = false.
       annotations:
         # The only provider-coupled lines in platform/. They have to be here:
         # this Service is what causes a load balancer to exist.

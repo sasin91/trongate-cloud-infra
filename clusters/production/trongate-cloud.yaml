@@ -191,6 +191,59 @@ spec:
         - op: replace
           path: /spec/storage/size
           value: 20Gi
+    # --- Two 8 GB nodes (2026-10-04): keep the shared services alive under
+    # memory pressure, keep builds bounded, keep the node disk in check. ---
+    #
+    # Shared services outrank tenants and builds (PriorityClass
+    # trongate-platform, apps/trongate-cloud/operators/priorityclass.yaml).
+    - target:
+        group: k8s.mariadb.com
+        kind: MariaDB
+      patch: |
+        - op: add
+          path: /spec/priorityClassName
+          value: trongate-platform
+    - target:
+        kind: StatefulSet
+        name: valkey
+        namespace: cache
+      patch: |
+        - op: add
+          path: /spec/template/spec/priorityClassName
+          value: trongate-platform
+    - target:
+        kind: Deployment
+        namespace: trongate-cloud
+      patch: |
+        - op: add
+          path: /spec/template/spec/priorityClassName
+          value: trongate-platform
+    # At most two build daemons (one running, one leftover) and 8 GiB of
+    # limits between them; a build pod may ask for 4 GiB
+    # (Manifests::buildkitd). Builds move to a separate machine later.
+    - target:
+        kind: ResourceQuota
+        name: buildkitd
+        namespace: buildkit
+      patch: |
+        - op: replace
+          path: /spec/hard/pods
+          value: "2"
+        - op: replace
+          path: /spec/hard/limits.memory
+          value: 8Gi
+        - op: replace
+          path: /spec/hard/limits.cpu
+          value: "4"
+    # JuiceFS local cache 1 GiB per node instead of 2 GiB: the nodes have
+    # 80 GB disks that also hold every tenant image.
+    - target:
+        kind: StorageClass
+        name: tenant-files
+      patch: |
+        - op: replace
+          path: /mountOptions/0
+          value: cache-size=1024
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

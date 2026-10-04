@@ -214,6 +214,24 @@ variable "automatically_upgrade_os" {
   default     = true
 }
 
+variable "control_plane_kubelet_args" {
+  description = <<-EOT
+    Kubelet arguments for control plane nodes. The default is kube-hetzner's own
+    (1.8 GiB reserved for k3s and the OS), which the module then sizes per
+    server type. Sampled on a kube-hetzner cluster (Scaleweb, 2026-10-04): a
+    cx23 control plane used ~2.5 GiB outside pods, more than that reservation,
+    so the scheduler hands out memory the node does not have.
+  EOT
+  type        = list(string)
+  default     = ["kube-reserved=cpu=250m,memory=1500Mi,ephemeral-storage=1Gi", "system-reserved=cpu=250m,memory=300Mi"]
+}
+
+variable "agent_kubelet_args" {
+  description = "Kubelet arguments for the fixed agent nodes. The default is kube-hetzner's own (600 MiB reserved)."
+  type        = list(string)
+  default     = ["kube-reserved=cpu=50m,memory=300Mi,ephemeral-storage=1Gi", "system-reserved=cpu=250m,memory=300Mi"]
+}
+
 variable "registries_config" {
   description = <<-EOT
     k3s registries.yaml contents, written to every node. Carries the pull-only
