@@ -15,7 +15,8 @@ resources:
   # Needs the Gateway API definitions and the GatewayClass the ingress creates.
   - gateway.yaml
   # TRONGATE-CLOUD: the issuers the Gateway's listeners name (HTTP-01, plus
-  # DNS-01 for *.trongate.dev), and the encrypted DNS token they read.
+  # DNS-01 for *.trongate.dev), the encrypted DNS token they read, and the
+  # HTTP-01 issuer for customers' own domains (letsencrypt-tenants).
   - cluster-issuers.yaml
   - secrets
   # Needs the Plan definition from platform/controllers/crds/.

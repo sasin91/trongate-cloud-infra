@@ -364,10 +364,16 @@ Ranked by how soon they bite.
    an egress rule from buildkitd to Traefik (kube-proxy short-cuts the load
    balancer address to the Traefik pod, which the private-range rule blocked).
    The first tenant deploy confirms it.
-2. **Custom domains** have no listener or certificate: a verified customer domain
-   matches none of the three HTTPS listeners, so its route attaches nowhere. It
-   needs a per-domain listener plus an HTTP-01 certificate (the worker would have
-   to manage both), or a different approach.
+2. **Custom domains** (trongate.cloud branch `port/custom-domains`): the worker
+   gives each routed custom domain its own Gateway in the tenant namespace, with
+   one HTTPS listener and a certificate from the HTTP-01-only ClusterIssuer
+   `letsencrypt-tenants` (`platform/configs/cluster-issuers.yaml`), whose
+   challenges attach to a per-namespace HTTP Gateway `acme-http01`. The platform
+   Gateway is untouched (Flux owns it; Traefik 3.7 does not support
+   ListenerSet). A domain is routed only once its DNS reaches the load balancer.
+   Unverified until the first custom domain is live: Traefik serving several
+   Gateways on the same entrypoints, and the challenge route on `acme-http01`
+   winning over the platform Gateway's `http-to-https` route.
 3. **Registry**: no garbage collection yet (needs a read-only window), one
    registry-wide push credential (trongate.cloud's open item), and distribution
    v3's S3 driver against Hetzner Object Storage is untested.

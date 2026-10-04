@@ -73,3 +73,48 @@ spec:
                 namespace: traefik
                 kind: Gateway
                 group: gateway.networking.k8s.io
+---
+# TRONGATE-CLOUD: certificates for customers' own domains (trongate.cloud's
+# PLATFORM_DOMAIN_ISSUER).
+#
+# The worker gives every routed custom domain a Gateway in its tenant
+# namespace (tc-team-*, Manifests::domain_gateway) annotated with this issuer,
+# and cert-manager's Gateway support creates the Certificate. HTTP-01 only, on
+# purpose:
+#
+# - Customers' DNS is theirs, so DNS-01 is not an option.
+# - With no DNS-01 solver this issuer can never issue for *.trongate.dev, so a
+#   tenant Gateway cannot get a certificate for another app's {slug} host
+#   (trongate.cloud's worker-admission-policy.yaml refuses such listeners and
+#   allows no other issuer on tenant Gateways).
+#
+# The challenge route's parentRef has NO namespace, so it lands on the
+# HTTP-only Gateway "acme-http01" in the Certificate's own namespace
+# (Manifests::acme_gateway, created with every tenant namespace). The platform
+# Gateway's HTTP listener only admits routes from the traefik namespace, so a
+# challenge route in a tenant namespace could not attach there. The kit's
+# hostname policy skips tc-team-* namespaces (admission/), so cert-manager may
+# create the challenge route there.
+#
+# An un-pointed domain would only fail its challenge and use up Let's
+# Encrypt's failed-validation limit, so trongate.cloud routes a custom domain
+# only once its DNS reaches the load balancer (its db/016 DNS gate).
+#
+# Production directly: the staging step above was for the platform's own
+# hostnames, and a customer domain that points here validates like they did.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-tenants
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-tenants-account-key
+    solvers:
+      - http01:
+          gatewayHTTPRoute:
+            parentRefs:
+              - name: acme-http01
+                kind: Gateway
+                group: gateway.networking.k8s.io
