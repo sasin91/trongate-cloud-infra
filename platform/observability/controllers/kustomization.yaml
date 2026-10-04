@@ -19,7 +19,14 @@ resources:
   - namespace.yaml
   - sources.yaml
   - victoria-metrics-k8s-stack.yaml
-  - victoria-logs.yaml
+  # TRONGATE-CLOUD metrics-only trim (2026-10-04, two 8 GB nodes): metrics stay
+  # (VictoriaMetrics single, vmagent, kube-state-metrics, node-exporter), which
+  # is what measures memory per app and node pressure. Logs, probes, Grafana
+  # and alerting are off until there is room and somewhere to send alerts;
+  # `kubectl logs` and the worker's task logs in MariaDB cover logs meanwhile.
+  # Restore each line together with its counterpart in ../configs and the
+  # values in victoria-metrics-k8s-stack.yaml.
+  # - victoria-logs.yaml
   # TRONGATE-CLOUD single-node profile: no trace pipeline. Tempo (512Mi-2Gi and
   # a 20Gi volume) and the collector (192Mi-512Mi) are the least-used third of
   # the stack on a cluster whose only spans would come from the ingress.
@@ -28,7 +35,8 @@ resources:
   # ingress.yaml), the Tempo datasource, scrape and probe target.
   # - otel-collector.yaml
   # - tempo.yaml
-  - blackbox-exporter.yaml
+  # - blackbox-exporter.yaml
   # A directory, not a file. kustomize refuses to load a file from outside its
   # own directory; a sibling directory with its own kustomization is fine.
-  - ../secrets
+  # Only the Grafana admin credential lives there; Grafana is off.
+  # - ../secrets

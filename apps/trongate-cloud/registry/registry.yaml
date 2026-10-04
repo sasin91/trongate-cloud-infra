@@ -54,9 +54,9 @@ spec:
             - name: REGISTRY_STORAGE
               value: s3
             - name: REGISTRY_STORAGE_S3_REGION
-              value: hel1
+              value: fsn1
             - name: REGISTRY_STORAGE_S3_REGIONENDPOINT
-              value: https://hel1.your-objectstorage.com
+              value: https://fsn1.your-objectstorage.com
             # Required alongside regionendpoint since distribution v3.
             - name: REGISTRY_STORAGE_S3_FORCEPATHSTYLE
               value: "true"

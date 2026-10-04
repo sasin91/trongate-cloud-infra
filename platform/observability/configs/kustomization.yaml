@@ -12,7 +12,11 @@ kind: Kustomization
 namespace: observability
 resources:
   - scrapes.yaml
-  - probes.yaml
+  # TRONGATE-CLOUD metrics-only trim: the probes need blackbox-exporter, which
+  # is off (../controllers/kustomization.yaml). The blackbox and Vector scrapes
+  # in scrapes.yaml stay; with nothing to select they scrape nothing. The
+  # VMRules stay too and are evaluated again once vmalert is back.
+  # - probes.yaml
   - rules-platform.yaml
   - rules-tenant-guarantees.yaml
   - rules-loaded.yaml

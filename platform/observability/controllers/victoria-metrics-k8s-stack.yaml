@@ -168,7 +168,8 @@ spec:
     # Evaluate
     # ------------------------------------------------------------------
     vmalert:
-      enabled: true
+      # TRONGATE-CLOUD metrics-only trim; see ./kustomization.yaml.
+      enabled: false
       ingress:
         enabled: false
       route:
@@ -187,7 +188,8 @@ spec:
     # Route
     # ------------------------------------------------------------------
     alertmanager:
-      enabled: true
+      # TRONGATE-CLOUD metrics-only trim; see ./kustomization.yaml.
+      enabled: false
       ingress:
         enabled: false
       route:
@@ -244,7 +246,8 @@ spec:
     # rediscover this reasoning first. Two layers where the inner one is
     # disabled is one layer wearing a costume.
     grafana:
-      enabled: true
+      # TRONGATE-CLOUD metrics-only trim; see ./kustomization.yaml.
+      enabled: false
       ingress:
         enabled: false
         hosts: []
@@ -510,7 +513,8 @@ spec:
           enabled: false
           url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaTraces/v0.10.0/deployment/docker/rules/alerts-health.yml
     defaultDashboards:
-      enabled: true
+      # TRONGATE-CLOUD metrics-only trim; see ./kustomization.yaml.
+      enabled: false
       sources:
         kube-prometheus:
           url: https://raw.githubusercontent.com/prometheus-operator/kube-prometheus/v0.18.0/manifests/grafana-dashboardDefinitions.yaml
