@@ -188,6 +188,17 @@ spec:
         - op: add
           path: /spec/parentRefs/0/sectionName
           value: https-platform
+    # FrankenPHP needs NET_BIND_SERVICE in the bounding set to exec at all
+    # (file capability on the binary). Fixed in trongate.cloud#2; drop this
+    # patch after the merge.
+    - target:
+        kind: Deployment
+        name: trongate-cloud-app
+        namespace: trongate-cloud
+      patch: |
+        - op: add
+          path: /spec/template/spec/containers/0/securityContext/capabilities/add
+          value: ["NET_BIND_SERVICE"]
     # Cost: 20Gi instead of 50Gi for shared-1 (EUR 1.14 vs 2.86/month). The
     # hcloud-volumes class allows expansion, so this grows in place when
     # tenant databases and JuiceFS metadata need it.
