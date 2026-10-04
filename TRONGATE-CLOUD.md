@@ -1,7 +1,8 @@
 # trongate.cloud infrastructure
 
 This repository is [hcloud-k3s-platform-kit](https://github.com/sasin91/hcloud-k3s-platform-kit)
-tuned for trongate.cloud: one x86 node (cx43) for about EUR 26 a month, with the
+tuned for trongate.cloud: two x86 nodes (cx33) behind a Hetzner load balancer
+in fsn1, for about EUR 36 a month, with the
 trongate.cloud platform (`sasin91/trongate.cloud`, `deploy/k8s`) reconciled by
 Flux beside the kit's own layers.
 
@@ -17,78 +18,72 @@ from the Hetzner API on 2026-10-03.
 
 ## 1. The profile
 
-| | Kit default | This repository |
+| | Kit default | This repository (decided 2026-10-04) |
 |---|---|---|
-| Nodes | 3 control planes (cpx22) + 2 agents (cpx32) | 1 cx43 in hel1, control plane that also runs workloads |
-| Architecture | x86 | x86, one architecture everywhere (decided 2026-10-04; cx43 out of stock at the time, so provisioning waits for it) |
-| Autoscaler | cpx32, 0 to 5 | same type as the node, 0 to 1 |
-| Ingress entry | Hetzner lb11 | Traefik on the node's IPv4 through k3s servicelb (klipper), `externalTrafficPolicy: Local` so client IPs are real |
-| Ingress / cert-manager / metrics-server | 2 replicas + PDBs | 1 replica, no PDBs (a PDB of 1 over 1 replica blocks every drain) |
-| Certificates | HTTP-01, HTTPS listener commented | HTTP-01 (no email) for trongate.cloud and registry.trongate.cloud (DNS at Porkbun); DNS-01 through Hetzner DNS and Hetzner's cert-manager webhook for the customer-app wildcard *.trongate.dev |
-| OS updates | unattended + kured | off, as kube-hetzner advises for one node; patch by hand (section 6) |
-| Observability | VM stack, VictoriaLogs, Tempo, OTel collector, blackbox x2 | VM stack (15d on 10Gi), VictoriaLogs (7d, 8GB on 10Gi), blackbox x1; no Tempo, no collector, Traefik tracing off |
+| Nodes | 3 control planes (cpx22) + 2 agents (cpx32) | 1 control plane that also runs workloads + 1 agent, both cx33 (x86, 4 vCPU / 8 GB / 80 GB), fsn1 |
+| Architecture | x86 | x86 only, everywhere: the cluster, customer builds, dev machines |
+| Autoscaler | cpx32, 0 to 5 | cx33, 0 to 1 |
+| Ingress entry | Hetzner lb11 | Hetzner lb11 in fsn1, Traefik 2 replicas (one per node) with a PDB, as the kit |
+| cert-manager / metrics-server | 2 replicas + PDBs | 1 replica, no PDBs |
+| Certificates | HTTP-01, HTTPS listener commented | HTTP-01 for trongate.cloud and registry.trongate.cloud (DNS at Porkbun); DNS-01 through Hetzner DNS for the customer-app wildcard *.trongate.dev |
+| OS updates | unattended + kured | off; patch by hand (section 6) |
+| Observability | VM stack, VictoriaLogs, Tempo, OTel, blackbox, Grafana, alerting | metrics only: VictoriaMetrics single (15d on 10Gi), vmagent, kube-state-metrics, node-exporter |
+| Memory guards | module defaults | control plane reserves 2.5 GiB for k3s (Scaleweb's cx23 control plane measured ~2.5 GiB outside pods), eviction thresholds on both nodes, PriorityClass `trongate-platform` for MariaDB, Valkey, app and worker, build quota 2 pods / 8 GiB, JuiceFS cache 1 GiB |
 
-Files: `infrastructure/hetzner/trongate-cloud.auto.tfvars` (the shape, committed,
-no secrets), `main.tf` / `variables.tf` (the switches, kit defaults unchanged),
-`platform/controllers/releases/{ingress,cert-manager,metrics-server}.yaml`,
-`platform/observability/**`.
+Why two cx33 and not one cx43: on 2026-10-03/04 cx43 (8 vCPU / 16 GB, EUR
+15.99) and every ARM CAX type were out of stock in every EU location, cpx42
+cost EUR 69.49, and cx33 was in stock (fsn1 only by 08:43 UTC on 2026-10-04,
+hence fsn1). Trade-offs accepted:
+
+- The control plane stays a cx33. Changing its type may replace the server,
+  and replacing a single etcd member is a rebuild from snapshot. Grow by adding
+  agents; check that `tofu plan` says update in place before any type change.
+- 80 GB of disk per node holds tenant images, the JuiceFS cache and build
+  scratch space.
+- Volumes attach to one node; if that node dies, the pod moves only after the
+  CSI driver force-detaches (minutes).
+- One control plane: not HA. A control-plane reboot stops the API; the load
+  balancer keeps serving through the agent's Traefik.
 
 ### Growing out of it
 
-In order of cost, each a small diff:
-
-1. `autoscaler_max_nodes = 2..n` for more burst.
-2. `agent_count = 1` and `allow_scheduling_on_control_plane = false` for a fixed worker.
-3. A Hetzner load balancer: `enable_klipper_lb = false`, set Traefik's
-   `externalTrafficPolicy` back to `Cluster`, and decide on PROXY protocol
-   (both halves are commented in `ingress.yaml`). The `hel1`/`lb11` annotations
-   are already there. Point DNS at the LB.
-4. HA: `control_plane_count = 3`. Grow only; shrinking an etcd cluster destroys it.
-5. With a second node, undo the single-replica changes (search
-   `TRONGATE-CLOUD single-node profile`) and remove the `ingress-ha waiver`
-   comment in `ingress.yaml`.
+1. `autoscaler_max_nodes = 2..n` for more burst, or `agent_count = 2..n` for
+   fixed capacity (cx33 or cx43 agents).
+2. HA: `control_plane_count = 3`. Grow only, never shrink.
+3. Turn observability back on piece by piece (`platform/observability/`);
+   each disabled piece says what to restore with it.
 
 ---
 
 ## 2. Cost
 
-Net prices from `hcloud server-type list/describe` and the `/v1/pricing` API,
-hel1, 2026-10-03. The account those calls used reports VAT 0 %; if trongate.cloud
-is billed to a private customer in Denmark, add 25 %.
+Net prices from the Hetzner API (`hcloud server-type list`, `/v1/pricing`),
+fsn1, 2026-10-04. Add 25 % VAT if billed to a private customer in Denmark.
 
 | Item | Detail | EUR / month |
 |---|---|---:|
-| cx43 (x86) | 8 vCPU (Intel, shared), 16 GB, 160 GB disk, 20 TB traffic | 15.99 |
-| Primary IPv4 | one, on the node (IPv6 free) | 0.50 |
-| Block volumes | 60 GB at 0.0572/GB: shared MariaDB 20, platform MariaDB 10, Valkey 10, VictoriaMetrics 10, VictoriaLogs 10 | 3.43 |
-| Object Storage | base price, 1 TB storage + 1 TB egress across all buckets (tofu state, etcd snapshots, JuiceFS, registry, backups). Figure from a July 2026 third-party summary of Hetzner's price list; the API does not expose it, check it in the console | 6.49 |
+| 2 x cx33 | 4 vCPU (Intel, shared), 8 GB, 80 GB disk each | 16.98 |
+| Primary IPv4 x 2 | one per node (IPv6 free) | 1.00 |
+| Load balancer lb11 | fsn1 | 7.49 |
+| Block volumes | 50 GB at 0.0572/GB: shared MariaDB 20, platform MariaDB 10, Valkey 10, VictoriaMetrics 10 | 2.86 |
+| Object Storage | base price, 1 TB storage + 1 TB egress across all buckets (third-party summary of Hetzner's price list, July 2026; not in the API) | 6.49 |
 | DNS | trongate.cloud at Porkbun; trongate.dev zone in Hetzner DNS | 0.00 |
-| OS snapshot | the Leap Micro image the node boots from, about 1-2 GB at 0.0143/GB | 0.03 |
-| **Steady state** | | **~26.44** |
-| Rejected alternatives | cpx42 (x86, EUR 69.49, in stock) ~79.94; CAX31 (arm, EUR 20.99) ~31.44, out of stock and a second architecture; OVH Managed Kubernetes with a 4 vCPU / 15 GB node (b2-15, EUR 48.05) plus LB (EUR 6) and volumes ~57, from OVH's public catalog API 2026-10-04 | |
-| Autoscaled second node | only while the autoscaler holds it, billed hourly | 0 to the node price |
-| Later: lb11 | if the single IP becomes a problem | +7.49 |
-| Later: server backups | +20 % of the server price; not enabled (restic to object storage is the plan) | +4.20 |
+| OS snapshot | Leap Micro x86, ~1-2 GB at 0.0143/GB | 0.03 |
+| **Steady state** | | **~34.85** |
+| Autoscaled cx33 | only while the autoscaler holds it, hourly | 0 to 8.49 |
+| Rejected | one cx43 ~26 (out of stock); cpx42 ~80; CAX31 (arm) ~31 (out of stock, second architecture); OVH Managed Kubernetes ~57 (b2-15 node EUR 48.05 + LB 6 + volumes, OVH catalog API) | |
 
-For comparison, the kit's default shape (3 x cpx22 at 19.49, 2 x cpx32 at
-35.49, lb11, five IPv4s) is about EUR 140 a month before volumes.
+### Capacity (estimated before the first spike)
 
-### Capacity on the node (estimated, before any spike)
-
-Requests summed from the manifests and chart defaults; real use is usually lower.
-
-| Consumer | Memory request |
+| | Memory |
 |---|---:|
-| k3s, kubelet reservations, CCM, CSI, CoreDNS, servicelb | ~1.0 GiB |
-| Flux, cert-manager, Traefik, metrics-server, upgrade controller | ~0.6 GiB |
-| Observability (vmsingle 512Mi, vmagent, vmalert, Grafana, kube-state-metrics, VictoriaLogs 256Mi, Vector, blackbox) | ~1.6 GiB |
-| trongate.cloud shared: MariaDB shared-1 1.5Gi, platform MariaDB 384Mi, Valkey 896Mi, app, worker, Sablier, registry, mariadb-operator | ~3.6 GiB |
-| JuiceFS CSI controller, node plugin and the shared mount pod | ~0.5-1 GiB (verify) |
-| **Fixed** | **~7.5-8 GiB** |
+| Node capacity, 2 x cx33 | ~15.2 GiB |
+| Kubelet reservations (control plane 2.5 GiB + eviction, agent 1 GiB + eviction) | ~4.1 GiB |
+| Fixed services: MariaDB shared-1 1.5Gi, platform MariaDB 384Mi, Valkey 896Mi, app, worker, Sablier, registry, operators, Flux, cert-manager, Traefik x2, CCM/CSI, metrics stack | ~5.6 GiB |
+| **Left for tenant apps and builds** | **~5.5 GiB** |
 
-That leaves roughly 7 GiB of the 16 GB for tenant pods (96Mi request each in
-`Manifests::APP_RESOURCES`) and per-build BuildKit pods (1Gi request each). The
-first spike (section 7) replaces the tenant side of this with a measurement.
+That is roughly 55 awake apps at the 96Mi request in `Manifests::APP_RESOURCES`
+before the autoscaler adds a third cx33. Spike 1 replaces the guess.
 
 ---
 
@@ -201,15 +196,17 @@ config.
 3. **Object storage credential** (Security, S3 credentials) in that project.
    Hetzner credentials reach every bucket in the project; one per consumer
    (OpenTofu/etcd, JuiceFS, registry, backups) at least makes rotation local.
-4. **Buckets in hel1.** Names are global across Hetzner customers; change the
+4. **Buckets in fsn1.** Names are global across Hetzner customers; change the
    prefix if taken, and keep the files below in step.
-   - `trongate-cloud-tofu-state` (versioned) and `trongate-cloud-etcd-snapshots`
-     (expiring): `scripts/bootstrap-buckets.sh` with
-     `S3_ENDPOINT=https://hel1.your-objectstorage.com S3_REGION=hel1`.
-   - `trongate-cloud` (JuiceFS data; the bucket created first, in the console),
-     `trongate-cloud-registry`, `trongate-cloud-backups`.
-   Done 2026-10-03: all five exist in hel1, state versioned, snapshots expire
-   after 30 days.
+   - `trongate-cloud-fsn1-tofu-state` (versioned) and
+     `trongate-cloud-fsn1-etcd-snapshots` (expiring):
+     `scripts/bootstrap-buckets.sh` with
+     `S3_ENDPOINT=https://fsn1.your-objectstorage.com S3_REGION=fsn1`.
+   - `trongate-cloud-fsn1-juicefs`, `trongate-cloud-fsn1-registry`,
+     `trongate-cloud-fsn1-backups`.
+   Done 2026-10-04: all five exist in fsn1, state versioned, snapshots expire
+   after 30 days. (The first set was in hel1 and was deleted, empty, when the
+   cluster moved to fsn1.)
 5. **DNS** (decided 2026-10-03).
    - `trongate.cloud` stays at Porkbun. Its exact hostnames get certificates
      over HTTP-01, which needs no DNS credentials.
@@ -248,7 +245,7 @@ config.
 
 `sops --encrypt --in-place <file>` for each. Values to keep consistent:
 
-- `juicefs-secret.bucket`: `https://trongate-cloud.hel1.your-objectstorage.com`
+- `juicefs-secret.bucket`: `https://trongate-cloud-fsn1-juicefs.fsn1.your-objectstorage.com`
   (the example says fsn1), and the same password in `juicefs-meta` and `metaurl`.
 - `registry-push` in `trongate-cloud.sops.yaml`: a dockerconfigjson for
   `registry.trongate.cloud` with the registry's `push` user.
