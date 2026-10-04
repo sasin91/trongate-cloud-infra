@@ -132,11 +132,17 @@ spec:
   # Platform images from the cluster's own registry, pushed by
   # bin/push-images.sh. Until trongate.cloud#2 merges, that repository's
   # kustomization still names ghcr.io; drop this block after the merge.
+  #
+  # PINNED TO A COMMIT, not :main. The Deployments pull with IfNotPresent, so a
+  # node that already holds :main keeps running the old image after a push and
+  # a restart. Bump newTag to the sha bin/push-images.sh prints.
   images:
     - name: ghcr.io/sasin91/trongate-cloud
       newName: registry.trongate.cloud/platform/trongate-cloud
+      newTag: 4cbb536
     - name: ghcr.io/sasin91/trongate-cloud-worker
       newName: registry.trongate.cloud/platform/trongate-cloud-worker
+      newTag: 4cbb536
   # No postBuild substitution: files/storageclass.yaml carries ${...} in its
   # pathPattern (README step 3).
   #
