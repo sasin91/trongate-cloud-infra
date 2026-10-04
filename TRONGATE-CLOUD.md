@@ -1,7 +1,7 @@
 # trongate.cloud infrastructure
 
 This repository is [hcloud-k3s-platform-kit](https://github.com/sasin91/hcloud-k3s-platform-kit)
-tuned for trongate.cloud: one ARM node (CAX31) for about EUR 31 a month, with the
+tuned for trongate.cloud: one x86 node (cx43) for about EUR 26 a month, with the
 trongate.cloud platform (`sasin91/trongate.cloud`, `deploy/k8s`) reconciled by
 Flux beside the kit's own layers.
 
@@ -19,8 +19,8 @@ from the Hetzner API on 2026-10-03.
 
 | | Kit default | This repository |
 |---|---|---|
-| Nodes | 3 control planes (cpx22) + 2 agents (cpx32) | 1 CAX31 in hel1, control plane that also runs workloads |
-| Architecture | x86 | arm64 (cheapest 16 GB type in stock on 2026-10-03; x86 is one variable away) |
+| Nodes | 3 control planes (cpx22) + 2 agents (cpx32) | 1 cx43 in hel1, control plane that also runs workloads |
+| Architecture | x86 | x86, one architecture everywhere (decided 2026-10-04; cx43 out of stock at the time, so provisioning waits for it) |
 | Autoscaler | cpx32, 0 to 5 | same type as the node, 0 to 1 |
 | Ingress entry | Hetzner lb11 | Traefik on the node's IPv4 through k3s servicelb (klipper), `externalTrafficPolicy: Local` so client IPs are real |
 | Ingress / cert-manager / metrics-server | 2 replicas + PDBs | 1 replica, no PDBs (a PDB of 1 over 1 replica blocks every drain) |
@@ -58,14 +58,14 @@ is billed to a private customer in Denmark, add 25 %.
 
 | Item | Detail | EUR / month |
 |---|---|---:|
-| CAX31 (arm64) | 8 vCPU (Ampere), 16 GB, 160 GB disk, 20 TB traffic | 20.99 |
+| cx43 (x86) | 8 vCPU (Intel, shared), 16 GB, 160 GB disk, 20 TB traffic | 15.99 |
 | Primary IPv4 | one, on the node (IPv6 free) | 0.50 |
 | Block volumes | 60 GB at 0.0572/GB: shared MariaDB 20, platform MariaDB 10, Valkey 10, VictoriaMetrics 10, VictoriaLogs 10 | 3.43 |
 | Object Storage | base price, 1 TB storage + 1 TB egress across all buckets (tofu state, etcd snapshots, JuiceFS, registry, backups). Figure from a July 2026 third-party summary of Hetzner's price list; the API does not expose it, check it in the console | 6.49 |
 | DNS | trongate.cloud at Porkbun; trongate.dev zone in Hetzner DNS | 0.00 |
 | OS snapshot | the Leap Micro image the node boots from, about 1-2 GB at 0.0143/GB | 0.03 |
-| **Steady state** | | **~31.44** |
-| x86 alternatives | cx43 (EUR 15.99, out of stock everywhere in the EU on 2026-10-03) would make it ~26.44; cpx42 (EUR 69.49) ~79.94 | |
+| **Steady state** | | **~26.44** |
+| Rejected alternatives | cpx42 (x86, EUR 69.49, in stock) ~79.94; CAX31 (arm, EUR 20.99) ~31.44, out of stock and a second architecture; OVH Managed Kubernetes with a 4 vCPU / 15 GB node (b2-15, EUR 48.05) plus LB (EUR 6) and volumes ~57, from OVH's public catalog API 2026-10-04 | |
 | Autoscaled second node | only while the autoscaler holds it, billed hourly | 0 to the node price |
 | Later: lb11 | if the single IP becomes a problem | +7.49 |
 | Later: server backups | +20 % of the server price; not enabled (restic to object storage is the plan) | +4.20 |
@@ -92,7 +92,7 @@ first spike (section 7) replaces the tenant side of this with a measurement.
 
 ---
 
-## 3. arm64 check
+## 3. arm64 check (historical: the cluster is x86)
 
 Every image the cluster runs was looked up in its registry on 2026-10-03
 (manifest list platforms). All have `linux/arm64` (and `linux/amd64`, so moving to x86 later changes nothing here).
@@ -112,16 +112,10 @@ Every image the cluster runs was looked up in its registry on 2026-10-03
 
 **Flagged:**
 
-- `ghcr.io/sasin91/trongate-cloud:main` and `ghcr.io/sasin91/trongate-cloud-worker:main`
-  are not published yet (GHCR answers 403 anonymously, and trongate.cloud's
-  CI only lints the Dockerfiles). Build them for `linux/arm64` with buildx.
-  `Dockerfile.worker` declares `ARG TARGETARCH=amd64`; buildx overrides it from
-  `--platform`, a plain `docker build` on an x86 machine does not, and would
-  put x86 railpack and buildctl binaries in an arm image.
-- Tenant images are built natively on the node by BuildKit, so they come out
-  arm64 with nothing to configure. A customer repository that commits x86-only
-  binaries (a vendored wkhtmltopdf, a closed-source PHP loader) will build and
-  then fail at run time; that is the one ARM-specific failure to watch for.
+- The platform images are built by trongate.cloud's Images workflow (PR #2)
+  for linux/amd64 and pushed to `registry.trongate.cloud/platform/*`.
+- The cluster is x86 since 2026-10-04, so this table now only says the stack
+  could move to ARM without image changes.
 
 ---
 
@@ -284,11 +278,11 @@ cp backend.hcl.example backend.hcl
 tofu init -backend-config=backend.hcl
 python ../../scripts/checks/check-fetched-module-line-endings.py
 python ../../scripts/checks/check-pool-availability.py   # needs HCLOUD_TOKEN
-# ARM snapshot, about 5 minutes on a temporary server. The template pins
-# Packer to exactly 1.16.0 (winget installs newer; use the release zip):
+# x86 snapshot, about 5 minutes on a temporary cx23 (the template's default,
+# in stock on 2026-10-04). The template pins Packer to exactly 1.16.0 (winget
+# installs newer; use the release zip):
 packer init  .terraform/modules/kube_hetzner/packer-template/hcloud-leapmicro-snapshots.pkr.hcl
-# The template's default builder (cax11 in fsn1) was out of stock on 2026-10-03:
-packer build -only='hcloud.leapmicro-arm-snapshot' -var arm_server_type=cax21 -var arm_location=hel1 \n  .terraform/modules/kube_hetzner/packer-template/hcloud-leapmicro-snapshots.pkr.hcl
+packer build -only='hcloud.leapmicro-x86-snapshot' .terraform/modules/kube_hetzner/packer-template/hcloud-leapmicro-snapshots.pkr.hcl
 tofu plan     # expect 1 server, no load balancer
 tofu apply
 tofu output -raw kubeconfig > ../../trongate-cloud.kubeconfig   # gitignored
