@@ -39,8 +39,9 @@ metadata:
     # resolve yet fails in a loop that looks like patience.
     #
     # TRONGATE-CLOUD: cluster-issuers.yaml (HTTP-01, DNS-01 for *.trongate.dev).
-    # Staging first, then letsencrypt.
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    # Staging issued trongate.cloud and *.trongate.dev on 2026-10-04, so this is
+    # production now.
+    cert-manager.io/cluster-issuer: letsencrypt
 spec:
   gatewayClassName: traefik
   listeners:
