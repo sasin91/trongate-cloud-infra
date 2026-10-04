@@ -39,7 +39,8 @@ spec:
   # PRIVATE REPOSITORY: a read-only deploy key on sasin91/trongate.cloud, as a
   # hand-created Secret (the same exception the kit names for a private fork;
   # see clusters/README.md and TRONGATE-CLOUD.md for the command).
-  url: ssh://git@github.com/sasin91/trongate.cloud.git
+  # Port 443: the node firewall blocks outbound 22 (see flux-system/gotk-sync.yaml).
+  url: ssh://git@ssh.github.com:443/sasin91/trongate.cloud.git
   secretRef:
     name: trongate-cloud-deploy-key
   # Only the cluster manifests. The application source never reaches the

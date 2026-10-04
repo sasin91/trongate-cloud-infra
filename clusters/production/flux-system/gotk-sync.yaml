@@ -56,7 +56,9 @@ spec:
   #     --from-file=identity=./deploy-key \
   #     --from-file=identity.pub=./deploy-key.pub \
   #     --from-file=known_hosts=./known_hosts
-  url: ssh://git@github.com/sasin91/trongate-cloud-infra.git
+  # TRONGATE-CLOUD: GitHub's SSH endpoint on port 443. kube-hetzner's node
+  # firewall only lets DNS, NTP, HTTP and HTTPS out, so port 22 times out.
+  url: ssh://git@ssh.github.com:443/sasin91/trongate-cloud-infra.git
   secretRef:
     name: flux-system
 ---
