@@ -129,20 +129,16 @@ spec:
     provider: sops
     secretRef:
       name: sops-age
-  # Platform images from the cluster's own registry, pushed by
-  # bin/push-images.sh. Until trongate.cloud#2 merges, that repository's
-  # kustomization still names ghcr.io; drop this block after the merge.
-  #
-  # PINNED TO A COMMIT, not :main. The Deployments pull with IfNotPresent, so a
-  # node that already holds :main keeps running the old image after a push and
-  # a restart. Bump newTag to the sha bin/push-images.sh prints.
+  # Platform images (registry.trongate.cloud/platform/*, pushed by
+  # trongate.cloud's bin/push-images.sh) PINNED TO A COMMIT, not :main. The
+  # Deployments pull with IfNotPresent, so a node that already holds :main
+  # keeps running the old image after a push and a restart. Bump newTag to the
+  # sha bin/push-images.sh prints.
   images:
-    - name: ghcr.io/sasin91/trongate-cloud
-      newName: registry.trongate.cloud/platform/trongate-cloud
-      newTag: 4cbb536
-    - name: ghcr.io/sasin91/trongate-cloud-worker
-      newName: registry.trongate.cloud/platform/trongate-cloud-worker
-      newTag: 4cbb536
+    - name: registry.trongate.cloud/platform/trongate-cloud
+      newTag: 0a47add
+    - name: registry.trongate.cloud/platform/trongate-cloud-worker
+      newTag: 0a47add
   # No postBuild substitution: files/storageclass.yaml carries ${...} in its
   # pathPattern (README step 3).
   #
@@ -150,61 +146,6 @@ spec:
   # stays cluster-agnostic. Each is small; move it upstream if it should be the
   # app's default.
   patches:
-    # The kit's Gateway is traefik/platform, not traefik/traefik-gateway. The
-    # worker reads this when it writes tenant HTTPRoutes.
-    - target:
-        kind: ConfigMap
-        name: trongate-cloud
-        namespace: trongate-cloud
-      patch: |
-        - op: replace
-          path: /data/PLATFORM_GATEWAY_NAME
-          value: platform
-        # Customer apps on their own domain, {slug}.trongate.dev, so they can
-        # never set cookies for trongate.cloud (decided 2026-10-03). Move this
-        # into trongate.cloud's config.yaml and config/platform.php default
-        # once that repository adopts it.
-        - op: replace
-          path: /data/PLATFORM_APPS_DOMAIN
-          value: trongate.dev
-    # Keep the worker's admission policy in step with PLATFORM_APPS_DOMAIN
-    # (variable 2 of trongate-worker-objects is apps_domain).
-    - target:
-        group: admissionregistration.k8s.io
-        kind: ValidatingAdmissionPolicy
-        name: trongate-worker-objects
-      patch: |
-        - op: test
-          path: /spec/variables/2/name
-          value: apps_domain
-        - op: replace
-          path: /spec/variables/2/expression
-          value: "'trongate.dev'"
-    # The control panel's own route: same Gateway, and pinned to the listener
-    # that serves trongate.cloud.
-    - target:
-        group: gateway.networking.k8s.io
-        kind: HTTPRoute
-        name: trongate-cloud-app
-        namespace: trongate-cloud
-      patch: |
-        - op: replace
-          path: /spec/parentRefs/0/name
-          value: platform
-        - op: add
-          path: /spec/parentRefs/0/sectionName
-          value: https-platform
-    # FrankenPHP needs NET_BIND_SERVICE in the bounding set to exec at all
-    # (file capability on the binary). Fixed in trongate.cloud#2; drop this
-    # patch after the merge.
-    - target:
-        kind: Deployment
-        name: trongate-cloud-app
-        namespace: trongate-cloud
-      patch: |
-        - op: add
-          path: /spec/template/spec/containers/0/securityContext/capabilities/add
-          value: ["NET_BIND_SERVICE"]
     # Cost: 20Gi instead of 50Gi for shared-1 (EUR 1.14 vs 2.86/month). The
     # hcloud-volumes class allows expansion, so this grows in place when
     # tenant databases and JuiceFS metadata need it.

@@ -360,35 +360,29 @@ trongate.cloud's `db/001_*.sql` onwards (not `000`) through a port-forward to
 
 Ranked by how soon they bite.
 
-1. **trongate.cloud's repository still defaults to `apps.trongate.cloud`.**
-   This cluster sets `PLATFORM_APPS_DOMAIN=trongate.dev` and the worker
-   policy's `apps_domain` through Flux patches
-   (`clusters/production/trongate-cloud.yaml`). Move both into
-   `deploy/k8s/platform/config.yaml`, `worker-admission-policy.yaml`,
-   `config/platform.php` and `.env.example` so the app's defaults match.
-2. **Build pods may not reach the registry.** BuildKit pushes to
+1. **Build pods may not reach the registry.** BuildKit pushes to
    `registry.trongate.cloud`, which resolves to the node's own IP. kube-proxy
    short-cuts a LoadBalancer IP straight to the Traefik pod (10.42.x), and the
    buildkit NetworkPolicy in trongate.cloud denies egress to 10.0.0.0/8. If the
    first deploy's push hangs, add an egress rule from buildkitd to the `traefik`
    namespace on 8443 in `deploy/k8s/buildkit/buildkitd.yaml`. Inferred, not
    tested.
-3. **Platform images** are not built or published (section 3).
-4. **Custom domains** have no listener or certificate: a verified customer domain
+2. **Platform images** are not built or published (section 3).
+3. **Custom domains** have no listener or certificate: a verified customer domain
    matches none of the three HTTPS listeners, so its route attaches nowhere. It
    needs a per-domain listener plus an HTTP-01 certificate (the worker would have
    to manage both), or a different approach.
-5. **Routes without hostnames.** The kit policy that refused hostname-less routes
+4. **Routes without hostnames.** The kit policy that refused hostname-less routes
    no longer covers `tc-team-*`, and `trongate-worker-objects` allows them. The
    worker always sets hostnames, but the policy should require it
    (`has(object.spec.hostnames) && size(object.spec.hostnames) > 0`).
-6. **Registry**: no garbage collection yet (needs a read-only window), one
+5. **Registry**: no garbage collection yet (needs a read-only window), one
    registry-wide push credential (trongate.cloud's open item), and distribution
    v3's S3 driver against Hetzner Object Storage is untested.
-7. **JuiceFS mount pod resources**: the CSI driver's default for the shared mount
+6. **JuiceFS mount pod resources**: the CSI driver's default for the shared mount
    pod may reserve more memory than the rest of trongate.cloud's tenants; check
    and set `mountPodResources` if so.
-8. Everything trongate.cloud's README already lists under "needs a live cluster".
+7. Everything trongate.cloud's README already lists under "needs a live cluster".
 
 ## 8. First spikes once the cluster is up
 
@@ -412,5 +406,5 @@ Ranked by how soon they bite.
 5. **Cross-namespace `mariaDbRef`.** Confirm the tenant's Database, User and
    Grant in `tc-team-<id>` become Ready against `shared-1` in `databases` with
    operator 26.10.1, and that the app can log in.
-6. Added by this repository: open item 2 (build pod to registry), and a push and
+6. Added by this repository: open item 1 (build pod to registry), and a push and
    pull through `registry.trongate.cloud` to prove the S3 driver.
