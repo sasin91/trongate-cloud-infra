@@ -143,9 +143,8 @@ module "kube_hetzner" {
   # setting is about what the kit will provision, not what it can run.
   #
   # TRONGATE-CLOUD: a variable so a profile can choose arm (CAX). The default is
-  # still the kit's ["x86"]; trongate-cloud.auto.tfvars sets ["arm"], and every
-  # nodepool, autoscaler pools included, must then be a CAX type. Observed
-  # 2026-10-03: cax21/31/41 available in fsn1, nbg1 and hel1.
+  # still the kit's ["x86"], which trongate-cloud.auto.tfvars also uses; ["arm"]
+  # would need every nodepool, autoscaler pools included, to be a CAX type.
   enabled_architectures = var.enabled_architectures
 
   network_region = var.network_region

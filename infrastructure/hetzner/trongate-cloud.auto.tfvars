@@ -5,18 +5,18 @@
 # registries_config come from the environment (TF_VAR_...) or the gitignored
 # terraform.tfvars, exactly as the kit describes.
 #
-# Shape: one CAX31 (arm64, 8 vCPU / 16 GB / 160 GB, EUR 20.99/month net,
-# hel1) that is both control plane and worker, Traefik on the node's own IPv4
-# via k3s servicelb (no Hetzner LB), and an autoscaler pool that idles at 0 and
-# may add ONE more CAX31 under pressure.
+# Shape: one cx43 (x86, 8 vCPU / 16 GB / 160 GB, EUR 15.99/month net, hel1)
+# that is both control plane and worker, Traefik on the node's own IPv4 via k3s
+# servicelb (no Hetzner LB), and an autoscaler pool that idles at 0 and may add
+# ONE more cx43 under pressure.
 #
-# Why ARM, observed 2026-10-03 in fsn1/nbg1/hel1:
-#   cax31  arm  8 vCPU / 16 GB  EUR 20.99  available       <- this file
-#   cx43   x86  8 vCPU / 16 GB  EUR 15.99  UNAVAILABLE everywhere
-#   cpx42  x86  8 vCPU / 16 GB  EUR 69.49  available
-# Every image the cluster runs publishes linux/arm64 (TRONGATE-CLOUD.md, 3).
-# Moving to x86 later: enabled_architectures = ["x86"] and every *_server_type
-# below; a type change replaces the server.
+# One architecture, x86 (decided 2026-10-04): customer repos, dev machines and
+# vendored binaries assume it. Observed 2026-10-03/04 in fsn1/nbg1/hel1:
+#   cx43   x86  8 vCPU / 16 GB  EUR 15.99  out of stock   <- this file; wait for it
+#   cpx42  x86  8 vCPU / 16 GB  EUR 69.49  in stock       <- not worth it yet
+#   cax31  arm  8 vCPU / 16 GB  EUR 20.99  out of stock   (arm rejected: one arch)
+# check-pool-availability.py says when cx43 is back. A type change later
+# replaces the server.
 #
 # Growing out of this, in order of cost:
 #   - autoscaler_max_nodes > 1                     more burst capacity
@@ -27,26 +27,26 @@
 cluster_name   = "trongate-cloud"
 network_region = "eu-central"
 
-enabled_architectures = ["arm"]
+enabled_architectures = ["x86"]
 
 control_plane_location            = "hel1"
-control_plane_server_type         = "cax31"
+control_plane_server_type         = "cx43"
 control_plane_count               = 1
 allow_scheduling_on_control_plane = true
 
-# No fixed agents. The type is still declared (and arm) because the module
+# No fixed agents. The type is still declared (and x86) because the module
 # validates every pool's architecture, populated or not.
 agent_location    = "hel1"
-agent_server_type = "cax31"
+agent_server_type = "cx43"
 agent_count       = 0
 
 autoscaler_location    = "hel1"
-autoscaler_server_type = "cax31"
+autoscaler_server_type = "cx43"
 autoscaler_max_nodes   = 1
 
-# The commented-out fallback pool in main.tf must also be arm if enabled.
+# The commented-out fallback pool in main.tf must also be x86 if enabled.
 autoscaler_fallback_location    = "fsn1"
-autoscaler_fallback_server_type = "cax31"
+autoscaler_fallback_server_type = "cx43"
 
 enable_klipper_lb        = true
 automatically_upgrade_os = false
