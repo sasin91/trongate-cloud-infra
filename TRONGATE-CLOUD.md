@@ -360,29 +360,21 @@ trongate.cloud's `db/001_*.sql` onwards (not `000`) through a port-forward to
 
 Ranked by how soon they bite.
 
-1. **Build pods may not reach the registry.** BuildKit pushes to
-   `registry.trongate.cloud`, which resolves to the node's own IP. kube-proxy
-   short-cuts a LoadBalancer IP straight to the Traefik pod (10.42.x), and the
-   buildkit NetworkPolicy in trongate.cloud denies egress to 10.0.0.0/8. If the
-   first deploy's push hangs, add an egress rule from buildkitd to the `traefik`
-   namespace on 8443 in `deploy/k8s/buildkit/buildkitd.yaml`. Inferred, not
-   tested.
-2. **Platform images** are not built or published (section 3).
-3. **Custom domains** have no listener or certificate: a verified customer domain
+1. **Build pods reaching the registry is unverified.** trongate.cloud#2 added
+   an egress rule from buildkitd to Traefik (kube-proxy short-cuts the load
+   balancer address to the Traefik pod, which the private-range rule blocked).
+   The first tenant deploy confirms it.
+2. **Custom domains** have no listener or certificate: a verified customer domain
    matches none of the three HTTPS listeners, so its route attaches nowhere. It
    needs a per-domain listener plus an HTTP-01 certificate (the worker would have
    to manage both), or a different approach.
-4. **Routes without hostnames.** The kit policy that refused hostname-less routes
-   no longer covers `tc-team-*`, and `trongate-worker-objects` allows them. The
-   worker always sets hostnames, but the policy should require it
-   (`has(object.spec.hostnames) && size(object.spec.hostnames) > 0`).
-5. **Registry**: no garbage collection yet (needs a read-only window), one
+3. **Registry**: no garbage collection yet (needs a read-only window), one
    registry-wide push credential (trongate.cloud's open item), and distribution
    v3's S3 driver against Hetzner Object Storage is untested.
-6. **JuiceFS mount pod resources**: the CSI driver's default for the shared mount
+4. **JuiceFS mount pod resources**: the CSI driver's default for the shared mount
    pod may reserve more memory than the rest of trongate.cloud's tenants; check
    and set `mountPodResources` if so.
-7. Everything trongate.cloud's README already lists under "needs a live cluster".
+5. Everything trongate.cloud's README already lists under "needs a live cluster".
 
 ## 8. First spikes once the cluster is up
 
