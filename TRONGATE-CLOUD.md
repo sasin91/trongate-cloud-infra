@@ -294,9 +294,11 @@ tofu apply
 tofu output -raw kubeconfig > ../../trongate-cloud.kubeconfig   # gitignored
 ```
 
-If the platform images stay private on GHCR, add a `ghcr.io` entry with a
-`read:packages` token to `registries_config` as well (or publish them to
-`registry.trongate.cloud` once it is up).
+The platform images come from `registry.trongate.cloud/platform/*`, the same
+registry and pull credential as tenant images (trongate.cloud PR #2). Once the
+registry answers, set the trongate.cloud repository variable
+`PLATFORM_REGISTRY_READY=true` and run its Images workflow; until then the app
+and worker pods wait on image pulls.
 
 ### 5.5 DNS records
 

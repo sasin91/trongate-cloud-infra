@@ -4,7 +4,7 @@
 #
 #   infrastructure ─→ trongate-cloud-operators ─┬─→ trongate-cloud-secrets
 #                                               └─→ trongate-cloud ←─ platform
-#   platform ─→ trongate-cloud-registry
+#   platform ─→ trongate-cloud-registry ─→ trongate-cloud (images live there)
 #
 #   1. Operators   mariadb-operator (+CRDs) and the JuiceFS CSI driver, kept in
 #                  this repository (apps/trongate-cloud/operators says why).
@@ -107,6 +107,8 @@ spec:
     - name: trongate-cloud-operators
     # The Gateway, the DNS-01 issuers and the admission policies.
     - name: platform
+    # The app and worker images are pulled from registry.trongate.cloud.
+    - name: trongate-cloud-registry
   serviceAccountName: kustomize-controller
   sourceRef:
     kind: GitRepository
