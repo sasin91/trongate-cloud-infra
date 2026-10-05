@@ -136,9 +136,9 @@ spec:
   # sha bin/push-images.sh prints.
   images:
     - name: registry.trongate.cloud/platform/trongate-cloud
-      newTag: "77b67ed"
+      newTag: "951ec62"
     - name: registry.trongate.cloud/platform/trongate-cloud-worker
-      newTag: "77b67ed"
+      newTag: "951ec62"
   # No postBuild substitution: files/storageclass.yaml carries ${...} in its
   # pathPattern (README step 3).
   #
