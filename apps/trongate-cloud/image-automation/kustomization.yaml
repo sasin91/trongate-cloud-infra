@@ -1,0 +1,19 @@
+# TRONGATE-CLOUD: roll out trongate.cloud's platform images on every push to
+# its main (trongate.cloud deploy/k8s/README.md, "Deploying the platform").
+#
+#   push to main ─→ GitHub App webhook ─→ worker task build_platform
+#     ─→ registry.trongate.cloud/platform/{trongate-cloud,trongate-cloud-worker}
+#          :main-{commit time UTC}-{short sha}
+#     ─→ ImageRepository / ImagePolicy (newest main-* tag of the worker image,
+#          which the worker pushes last, so the app image with it exists)
+#     ─→ ImageUpdateAutomation commits it to the two newTag lines in
+#          clusters/production/trongate-cloud.yaml on main
+#     ─→ the root Kustomization applies it, trongate-cloud rolls out
+#
+# Pause rollouts: `flux suspend image update trongate-cloud` (resume to catch
+# up). Roll back: suspend, then set both newTag lines by hand.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - secrets
+  - image-automation.yaml

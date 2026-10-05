@@ -23,10 +23,13 @@ FLUX_VERSION="${FLUX_VERSION:-v2.9.3}"
 
 # The four default controllers, named explicitly rather than left to the
 # CLI's default, because a default is a value somebody else can change.
-# Deliberately excluded: image-reflector-controller and
-# image-automation-controller (this kit does not do image automation) and
-# source-watcher (a sample controller, not a platform component).
-FLUX_COMPONENTS="source-controller,kustomize-controller,helm-controller,notification-controller"
+# TRONGATE-CLOUD: plus image-reflector-controller and
+# image-automation-controller, which roll out trongate.cloud's platform images
+# on every push to its main (apps/trongate-cloud/image-automation). The kit
+# itself does not do image automation.
+# Deliberately excluded: source-watcher (a sample controller, not a platform
+# component).
+FLUX_COMPONENTS="source-controller,kustomize-controller,helm-controller,notification-controller,image-reflector-controller,image-automation-controller"
 
 OUT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/clusters/production/flux-system"
 OUT_FILE="${OUT_DIR}/gotk-components.yaml"

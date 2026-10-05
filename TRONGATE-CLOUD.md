@@ -107,8 +107,11 @@ Every image the cluster runs was looked up in its registry on 2026-10-03
 
 **Flagged:**
 
-- The platform images are built by trongate.cloud's Images workflow (PR #2)
-  for linux/amd64 and pushed to `registry.trongate.cloud/platform/*`.
+- The platform images are built in the cluster by trongate.cloud's worker
+  (task `build_platform`) on every push to its main, for linux/amd64, pushed to
+  `registry.trongate.cloud/platform/*` as `main-{commit time}-{sha}`, and
+  rolled out by Flux image automation (`apps/trongate-cloud/image-automation`).
+  `bin/push-images.sh` on a PC is the fallback.
 - The cluster is x86 since 2026-10-04, so this table now only says the stack
   could move to ARM without image changes.
 
