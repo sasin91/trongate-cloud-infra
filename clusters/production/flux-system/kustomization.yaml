@@ -55,7 +55,10 @@ patches:
       group: apps
       version: v1
       kind: Deployment
-      name: "(helm-controller|notification-controller|image-reflector-controller|image-automation-controller)"
+      # TRONGATE-CLOUD: not image-reflector-controller, which does not define
+      # the flag and would exit on start (check-flux-lockdown-flags.py). It
+      # only reads registries and holds no reference to another namespace.
+      name: "(helm-controller|notification-controller|image-automation-controller)"
 
   # helm-controller applies manifests too, and is bound to cluster-admin by the
   # same ClusterRoleBinding as kustomize-controller. A HelmRelease with no

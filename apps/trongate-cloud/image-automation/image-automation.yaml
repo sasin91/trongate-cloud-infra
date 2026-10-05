@@ -1,0 +1,80 @@
+# All in flux-system: the lockdown's --no-cross-namespace-refs applies to the
+# image controllers too (clusters/production/flux-system/kustomization.yaml).
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: trongate-cloud-worker
+  namespace: flux-system
+spec:
+  image: registry.trongate.cloud/platform/trongate-cloud-worker
+  # Push-to-rollout latency is build time plus at most this, plus the root
+  # GitRepository's 1m. A tag list from our own registry is cheap.
+  interval: 2m0s
+  secretRef:
+    name: registry-pull
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: trongate-cloud
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: trongate-cloud-worker
+  # main-{YYYYmmddHHMMSS of the commit, UTC}-{short sha}: newest commit wins,
+  # so rebuilding an older commit never rolls back. :main, :{sha} and
+  # :buildcache never match.
+  filterTags:
+    pattern: '^main-(?P<ts>[0-9]{14})-[0-9a-f]{7}$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+---
+# A second source for this repository with a WRITE deploy key. flux-system's
+# own key stays read-only; only the image automation can push.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: infra-write
+  namespace: flux-system
+spec:
+  # Only the automation uses it, and it clones on its own schedule.
+  interval: 60m0s
+  timeout: 60s
+  ref:
+    branch: main
+  # Port 443: the node firewall blocks outbound 22 (flux-system/gotk-sync.yaml).
+  url: ssh://git@ssh.github.com:443/sasin91/trongate-cloud-infra.git
+  secretRef:
+    name: infra-write-deploy-key
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: trongate-cloud
+  namespace: flux-system
+spec:
+  interval: 2m0s
+  sourceRef:
+    kind: GitRepository
+    name: infra-write
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        name: fluxcdbot
+        email: fluxcdbot@users.noreply.github.com
+      messageTemplate: |
+        chore(trongate-cloud): deploy {{ range $i, $c := .Changed.Changes }}{{ if eq $i 0 }}{{ $c.NewValue }}{{ end }}{{ end }}
+
+        Pushed by Flux image automation (apps/trongate-cloud/image-automation).
+    push:
+      branch: main
+  # Only the two marked newTag lines in trongate-cloud.yaml carry a setter.
+  update:
+    path: ./clusters/production
+    strategy: Setters

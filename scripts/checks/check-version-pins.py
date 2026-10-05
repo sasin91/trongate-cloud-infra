@@ -210,6 +210,12 @@ def check_flux_and_kustomize(check):
             if c.get(doc, "spec", "channel") or c.get(doc, "spec", "version"):
                 continue
 
+        # TRONGATE-CLOUD: an ImageRepository's image is the repository Flux
+        # scans for tags, never something that runs; its ImagePolicy decides
+        # the tag, and the setter writes it into a pinned newTag.
+        if kind == "ImageRepository" and api.startswith("image.toolkit.fluxcd.io"):
+            continue
+
         for path_tuple, value in c.walk(doc):
             if not path_tuple or path_tuple[-1] != "image" or not isinstance(value, str):
                 continue

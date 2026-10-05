@@ -5,6 +5,7 @@
 #   infrastructure ─→ trongate-cloud-operators ─┬─→ trongate-cloud-secrets
 #                                               └─→ trongate-cloud ←─ platform
 #   platform ─→ trongate-cloud-registry ─→ trongate-cloud (images live there)
+#   trongate-cloud-registry ─→ trongate-cloud-images (rolls out new images)
 #
 #   1. Operators   mariadb-operator (+CRDs) and the JuiceFS CSI driver, kept in
 #                  this repository (apps/trongate-cloud/operators says why).
@@ -129,16 +130,20 @@ spec:
     provider: sops
     secretRef:
       name: sops-age
-  # Platform images (registry.trongate.cloud/platform/*, pushed by
-  # trongate.cloud's bin/push-images.sh) PINNED TO A COMMIT, not :main. The
-  # Deployments pull with IfNotPresent, so a node that already holds :main
-  # keeps running the old image after a push and a restart. Bump newTag to the
-  # sha bin/push-images.sh prints.
+  # Platform images (registry.trongate.cloud/platform/*) PINNED TO A COMMIT,
+  # not :main. The Deployments pull with IfNotPresent, so a node that already
+  # holds :main keeps running the old image after a push and a restart.
+  # Flux image automation rewrites both newTag lines (the $imagepolicy
+  # markers) to the newest main-{commit time}-{sha} tag that trongate.cloud's
+  # worker builds on every push to its main; see
+  # apps/trongate-cloud/image-automation. Keep the markers on these lines.
+  # To pin by hand, suspend it first (`flux suspend image update trongate-cloud`).
+  # A hand-set tag must stay quoted: an all-digit-ish sha parses as a number.
   images:
     - name: registry.trongate.cloud/platform/trongate-cloud
-      newTag: "a7fbbdf"
+      newTag: "a7fbbdf" # {"$imagepolicy": "flux-system:trongate-cloud:tag"}
     - name: registry.trongate.cloud/platform/trongate-cloud-worker
-      newTag: "a7fbbdf"
+      newTag: "a7fbbdf" # {"$imagepolicy": "flux-system:trongate-cloud:tag"}
   # No postBuild substitution: files/storageclass.yaml carries ${...} in its
   # pathPattern (README step 3).
   #
@@ -230,6 +235,32 @@ spec:
   prune: true
   wait: true
   timeout: 5m0s
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+---
+# Rolls out trongate.cloud's platform images on every push to its main: Flux
+# image automation commits the newest main-* tag to the newTag lines above.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: trongate-cloud-images
+  namespace: flux-system
+spec:
+  dependsOn:
+    # The ImageRepository scans registry.trongate.cloud.
+    - name: trongate-cloud-registry
+  serviceAccountName: kustomize-controller
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./apps/trongate-cloud/image-automation
+  interval: 30m0s
+  retryInterval: 2m0s
+  prune: true
+  wait: true
+  timeout: 2m0s
   decryption:
     provider: sops
     secretRef:
