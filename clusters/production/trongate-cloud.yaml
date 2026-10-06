@@ -1,30 +1,3 @@
-# TRONGATE-CLOUD: trongate.cloud's platform, beside the kit's four layers.
-#
-# deploy/k8s/README.md's bootstrap order, as dependsOn edges:
-#
-#   infrastructure ─→ trongate-cloud-operators ─┬─→ trongate-cloud-secrets
-#                                               └─→ trongate-cloud ←─ platform
-#   platform ─→ trongate-cloud-registry ─→ trongate-cloud (images live there)
-#   trongate-cloud-registry ─→ trongate-cloud-images (rolls out new images)
-#
-#   1. Operators   mariadb-operator (+CRDs) and the JuiceFS CSI driver, kept in
-#                  this repository (apps/trongate-cloud/operators says why).
-#   2. Secrets     SOPS-encrypted, also in this repository.
-#   3. Platform    ./deploy/k8s from trongate.cloud's own repository, which
-#                  needs the operators' CRDs and the kit's Gateway, issuers and
-#                  admission policy (the `platform` layer).
-#   4. Schema      by hand, once MariaDB `platform` is Ready (TRONGATE-CLOUD.md).
-#
-# The registry needs only the Gateway, so it hangs off `platform` directly.
-#
-# ROOT TIMEOUT. The root Kustomization (flux-system/gotk-sync.yaml, 45m) waits
-# for these too. The longest chain through them is infrastructure 10m +
-# operators 10m + trongate-cloud 15m = 35m, inside the kit's 40m sum, so the
-# root's timeout does not change.
-#
-# Every Kustomization names kustomize-controller: the kit's lockdown gives one
-# that names none a powerless identity.
----
 # trongate.cloud's repository. A second source beside flux-system, in the same
 # namespace, so --no-cross-namespace-refs is satisfied.
 apiVersion: source.toolkit.fluxcd.io/v1
@@ -141,9 +114,9 @@ spec:
   # A hand-set tag must stay quoted: an all-digit-ish sha parses as a number.
   images:
     - name: registry.trongate.cloud/platform/trongate-cloud
-      newTag: "main-20261005153303-43b380e" # {"$imagepolicy": "flux-system:trongate-cloud:tag"}
+      newTag: "main-20261006165127-09e1caf" # {"$imagepolicy": "flux-system:trongate-cloud:tag"}
     - name: registry.trongate.cloud/platform/trongate-cloud-worker
-      newTag: "main-20261005153303-43b380e" # {"$imagepolicy": "flux-system:trongate-cloud:tag"}
+      newTag: "main-20261006165127-09e1caf" # {"$imagepolicy": "flux-system:trongate-cloud:tag"}
   # No postBuild substitution: files/storageclass.yaml carries ${...} in its
   # pathPattern (README step 3).
   #
