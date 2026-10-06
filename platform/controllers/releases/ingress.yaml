@@ -119,11 +119,17 @@ spec:
     # traefik.io Middleware using it in front of every scale-to-zero app
     # (Manifests::SABLIER_PLUGIN must match the name "sablier"). Traefik
     # downloads the plugin source from GitHub at start-up.
+    #
+    # v1.3.0, not v1.3.1: plugins.traefik.io's integrity check rejects the
+    # v1.3.1 archive ("plugin integrity check failed"), and when one plugin
+    # fails Traefik disables ALL plugins, so every Sablier route 404s. Checked
+    # 2026-10-06 against /public/validate: v1.0.1..v1.3.0 pass, v1.3.1 fails.
+    # Before bumping, check the Traefik start-up log for "Plugins are disabled".
     experimental:
       plugins:
         sablier:
           moduleName: github.com/sablierapp/sablier-traefik-plugin
-          version: v1.3.1
+          version: v1.3.0
 
     # NO CERTIFICATE RESOLVER. Empty on purpose, and checked in CI: an ACME
     # resolver configured here alongside cert-manager means somebody
