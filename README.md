@@ -1,4 +1,12 @@
-# hcloud-k3s-platform-kit
+# trongate.cloud infrastructure
+
+This repository runs [trongate.cloud](https://trongate.cloud): the cluster, its Flux configuration and its SOPS-encrypted secrets. It is a deployment of hcloud-k3s-platform-kit, described below. What trongate.cloud changed and why is in [TRONGATE-CLOUD.md](TRONGATE-CLOUD.md); the application itself lives in [sasin91/trongate.cloud](https://github.com/sasin91/trongate.cloud).
+
+An independent service. Not affiliated with or endorsed by the Trongate project.
+
+---
+
+## hcloud-k3s-platform-kit
 
 A decided k3s platform for Hetzner Cloud — GitOps delivery, encrypted secrets, observability, multi-tenancy, and the operational guardrails that come from having got these things wrong before.
 

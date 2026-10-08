@@ -36,28 +36,3 @@ Kubernetes cluster autoscaler and the system upgrade controller.
 
 Consult each project for its licence terms. Nothing in this repository grants
 rights to any of them.
-
-================================================================================
-EXAMPLE TENANTS — GAME SERVER EMULATORS
-================================================================================
-
-The example tenants deploy open-source server emulators. Those projects are
-licensed under the GNU General Public License, version 2, by their respective
-authors. This repository redistributes none of their source.
-
-This repository contains NO game data, and NO mechanism for obtaining any.
-
-Running these emulators requires data derived from a game client. That data is
-copyrighted by its publisher and is not distributed, referenced, or made
-obtainable by anything in this repository. Obtaining it, and determining whether
-your use is lawful in your jurisdiction and consistent with the publisher's
-terms, is entirely the operator's responsibility.
-
-The example tenants exist to demonstrate multi-tenancy on Kubernetes using
-workloads whose behaviour differs instructively from a web application — raw TCP
-without hostname multiplexing, per-tenant databases, and a simulation that does
-not scale horizontally. They are provided for EDUCATIONAL PURPOSES.
-
-The upstream projects themselves note that operating a public or commercial
-server may be unlawful in many jurisdictions. This project takes no position
-beyond theirs, asserts no more than they do, and offers no legal advice.

@@ -46,15 +46,12 @@ creation_rules:
       age1eyp26flc48tlgy32tmawjjvut92skkts9y3qycwtqpgqyunmu4zqjchqz6
 
 # =============================================================================
-# THE KEY ABOVE IS A PLACEHOLDER. IT IS NOT A VALID age RECIPIENT.
+# THE KEY ABOVE IS THIS CLUSTER'S age RECIPIENT. It is a public key: printing
+# it here is safe, and it is the only key every *.sops.yaml in this repository
+# is encrypted to. (The kit shipped an invalid placeholder here so sops would
+# refuse to encrypt until it was replaced.)
 #
-# It contains uppercase characters, which bech32 does not permit, so sops
-# refuses it rather than encrypting to a key nobody holds. That failure mode is
-# the point: a syntactically valid but unknown public key would encrypt
-# successfully and produce files that no cluster on earth can decrypt, and the
-# error would arrive at reconcile time, in a controller log, days later.
-#
-# Replace both occurrences with your own public key:
+# A fork replaces both occurrences with its own public key:
 #
 #     age-keygen -o age.agekey
 #     # Public key: age1... <- this line, both times

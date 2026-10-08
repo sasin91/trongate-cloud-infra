@@ -28,7 +28,7 @@ from the Hetzner API on 2026-10-03.
 | Certificates | HTTP-01, HTTPS listener commented | HTTP-01 for trongate.cloud and registry.trongate.cloud (DNS at Porkbun); DNS-01 through Hetzner DNS for the customer-app wildcard *.trongate.dev |
 | OS updates | unattended + kured | off; patch by hand (section 6) |
 | Observability | VM stack, VictoriaLogs, Tempo, OTel, blackbox, Grafana, alerting | metrics only: VictoriaMetrics single (15d on 10Gi), vmagent, kube-state-metrics, node-exporter |
-| Memory guards | module defaults | control plane reserves 2.5 GiB for k3s (Scaleweb's cx23 control plane measured ~2.5 GiB outside pods), eviction thresholds on both nodes, PriorityClass `trongate-platform` for MariaDB, Valkey, app and worker, build quota 2 pods / 8 GiB, JuiceFS cache 1 GiB |
+| Memory guards | module defaults | control plane reserves 2.5 GiB for k3s (a kube-hetzner cx23 control plane measured ~2.5 GiB outside pods), eviction thresholds on both nodes, PriorityClass `trongate-platform` for MariaDB, Valkey, app and worker, build quota 2 pods / 8 GiB, JuiceFS cache 1 GiB |
 
 Why two cx33 and not one cx43: on 2026-10-03/04 cx43 (8 vCPU / 16 GB, EUR
 15.99) and every ARM CAX type were out of stock in every EU location, cpx42
@@ -190,7 +190,7 @@ config.
 
 ### 5.1 Hetzner console
 
-1. **Project `trongate-cloud`.** New and separate from Scaleweb and kundeportal.
+1. **Project `trongate-cloud`.** Its own project, separate from anything else you run.
    Check its limits: at least 2 servers and 4 primary IPs (the node, plus the
    autoscaled node, dual stack).
 2. **API token** in that project, Read & Write. Add it as its own CLI context so
