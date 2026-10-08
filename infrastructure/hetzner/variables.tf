@@ -218,7 +218,7 @@ variable "control_plane_kubelet_args" {
   description = <<-EOT
     Kubelet arguments for control plane nodes. The default is kube-hetzner's own
     (1.8 GiB reserved for k3s and the OS), which the module then sizes per
-    server type. Sampled on a kube-hetzner cluster (Scaleweb, 2026-10-04): a
+    server type. Sampled on a kube-hetzner cluster (2026-10-04): a
     cx23 control plane used ~2.5 GiB outside pods, more than that reservation,
     so the scheduler hands out memory the node does not have.
   EOT

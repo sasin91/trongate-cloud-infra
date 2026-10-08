@@ -35,7 +35,7 @@ control_plane_count               = 1
 allow_scheduling_on_control_plane = true
 
 # k3s server + etcd measured at ~2.5 GiB outside pods on a kube-hetzner
-# control plane (Scaleweb, 2026-10-04); reserve accordingly so the scheduler
+# control plane (sampled 2026-10-04); reserve accordingly so the scheduler
 # does not overcommit the node, and evict before the kernel OOM-kills.
 control_plane_kubelet_args = [
   "kube-reserved=cpu=250m,memory=2048Mi,ephemeral-storage=1Gi",
