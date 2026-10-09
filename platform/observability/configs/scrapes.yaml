@@ -72,25 +72,3 @@ spec:
     - port: prom-exporter
       path: /metrics
       interval: 30s
----
-# TRONGATE-CLOUD: Traefik's request metrics, per pod (one per node). The
-# platform panel queries them from vmsingle for the Traffic cards on app and
-# project pages. Scraping the ingress never touches app pods, so apps asleep
-# behind Sablier stay asleep.
-apiVersion: operator.victoriametrics.com/v1beta1
-kind: VMPodScrape
-metadata:
-  name: traefik
-  namespace: observability
-spec:
-  namespaceSelector:
-    matchNames:
-      - traefik
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: traefik
-      app.kubernetes.io/instance: traefik-traefik
-  podMetricsEndpoints:
-    - port: metrics
-      path: /metrics
-      interval: 30s

@@ -100,10 +100,10 @@ spec:
     # cards (requests, status classes, response times per app and project).
     # Router labels are off by default; Traefik names a Gateway API router
     # httproute-{namespace}-{route}-gw-..., so each app's routers are found by
-    # its HTTPRoute name. Finer buckets than the default 0.1,0.3,1.2,5 so a
-    # median of a fast PHP page is not just "under 100 ms". Scraped by the
-    # VMPodScrape in platform/observability/configs/scrapes.yaml; the metrics
-    # port stays unexposed (pod-only).
+    # its HTTPRoute name. The platform worker reads each pod's metrics port
+    # (9100, pod-only, not exposed) every minute and keeps the counts in
+    # MariaDB; nothing else scrapes it. The buckets MUST match
+    # App_traffic::LE_COLUMNS in the app repository.
     metrics:
       prometheus:
         addRoutersLabels: true
