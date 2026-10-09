@@ -112,11 +112,12 @@ The same reasoning is why `check-manifests-render.sh` exists at all: YAML
 accepts a misspelled field, kustomize accepts it, and the API server ignores
 it. The object applies; the setting does not exist.
 
-## Group B — provider facts, on a schedule
+## Group B — provider facts
 
-`check-pool-availability.py`, run by `.github/workflows/pool-availability.yml`
-daily, on manual dispatch, and on pull requests touching the infrastructure
-configuration.
+`check-pool-availability.py`. TRONGATE-CLOUD: run by hand before `tofu apply`
+(TRONGATE-CLOUD.md 5.4). The kit's daily `pool-availability` workflow was
+removed: the cluster's pools are fixed, and the workflow failed every day
+without a token secret.
 
 It asserts that **every declared nodepool and autoscaler pool names an instance
 type currently AVAILABLE in its location.** The provider's API distinguishes
@@ -161,10 +162,7 @@ with **read-only** permission in the project holding the cluster.
 * No cluster access of any kind is involved — no kubeconfig goes into CI.
 * Locally: `HCLOUD_TOKEN_READ_ONLY=... python3 scripts/checks/check-pool-availability.py`.
   With no token the check **skips**; with `--require-token` it fails instead,
-  which is what the scheduled workflow passes.
-* A fork that has not set the secret gets a clean skip on pull requests and a
-  loud failure on the schedule. A scheduled check that quietly does nothing is
-  the exact failure mode this directory exists to prevent.
+  which is what the kit's scheduled workflow passed.
 
 ## Group C — what this directory deliberately does not check
 
