@@ -96,6 +96,19 @@ spec:
         headers:
           # Headers carry credentials far more often than anyone intends.
           defaultMode: drop
+    # TRONGATE-CLOUD: per-router request metrics for trongate.cloud's Traffic
+    # cards (requests, status classes, response times per app and project).
+    # Router labels are off by default; Traefik names a Gateway API router
+    # httproute-{namespace}-{route}-gw-..., so each app's routers are found by
+    # its HTTPRoute name. Finer buckets than the default 0.1,0.3,1.2,5 so a
+    # median of a fast PHP page is not just "under 100 ms". Scraped by the
+    # VMPodScrape in platform/observability/configs/scrapes.yaml; the metrics
+    # port stays unexposed (pod-only).
+    metrics:
+      prometheus:
+        addRoutersLabels: true
+        buckets: "0.025,0.05,0.1,0.25,0.5,1,2.5,5,10"
+
     # TRONGATE-CLOUD: back to the kit's ingress HA now that there are two
     # nodes and a load balancer (2026-10-04): one replica per node, a
     # disruption budget, required anti-affinity.
