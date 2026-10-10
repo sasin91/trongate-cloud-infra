@@ -204,13 +204,13 @@ spec:
     service:
       spec:
         type: LoadBalancer
-        # TRONGATE-CLOUD: Cluster, the kit's behaviour behind a Hetzner load
-        # balancer. Client addresses are not preserved yet: that needs the
-        # PROXY protocol pair below plus the load-balancer.hetzner.cloud/hostname
-        # annotation (otherwise in-cluster clients of the LB address, such as
-        # build pods pushing to registry.trongate.cloud, bypass the balancer and
-        # send no PROXY header). Left for later.
-        externalTrafficPolicy: Cluster
+        # TRONGATE-CLOUD: Local, so a connection reaches Traefik from the load
+        # balancer's own private address (10.255.0.2) rather than SNATed to a
+        # node's pod-network address. That keeps the PROXY protocol trust range
+        # below to the balancer's subnet instead of the pod network, which any
+        # pod could forge a header from. Traefik runs one replica per node on
+        # two of the three nodes; the balancer's health check skips the third.
+        externalTrafficPolicy: Local
       # TRONGATE-CLOUD: an lb11 in fsn1 (EUR 7.49/month, 2026-10-04), created by
       # the cloud controller because enable_klipper_lb = false.
       annotations:
@@ -249,15 +249,24 @@ spec:
         #
         # load-balancer.hetzner.cloud/uses-proxyprotocol: "true"
 
-    # ports:
-    #   web:
-    #     proxyProtocol:
-    #       trustedIPs:
-    #         - "10.0.0.0/8"   # the cluster's private network range, and nothing wider
-    #   websecure:
-    #     proxyProtocol:
-    #       trustedIPs:
-    #         - "10.0.0.0/8"
+    # TRONGATE-CLOUD: read the visitor's address from a PROXY protocol header,
+    # but only on connections from the load balancer's subnet (10.255.0.0/16,
+    # the "cloud" subnet the balancer's private IP is in; nodes are in
+    # 10.0.0.0/16 and pods in 10.42.0.0/16). From a trusted address the header
+    # is optional, so this half is safe to apply before the balancer starts
+    # sending one; from any other address (pods reaching the balancer IP
+    # through kube-proxy, e.g. build pods pushing to the registry) a header is
+    # ignored, never trusted. Traefik then writes X-Forwarded-For/X-Real-Ip
+    # itself and drops whatever a visitor sent (forwardedHeaders stays unset).
+    ports:
+      web:
+        proxyProtocol:
+          trustedIPs:
+            - "10.255.0.0/16"
+      websecure:
+        proxyProtocol:
+          trustedIPs:
+            - "10.255.0.0/16"
 
     # NO ENTRYPOINT-LEVEL HTTP-TO-HTTPS REDIRECT, deliberately.
     #
