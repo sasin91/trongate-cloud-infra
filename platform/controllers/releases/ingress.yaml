@@ -247,7 +247,10 @@ spec:
         # request; enabling the entrypoint alone, or trusting a range wider than
         # the balancer, lets a client forge its own address.
         #
-        # load-balancer.hetzner.cloud/uses-proxyprotocol: "true"
+        #
+        # TRONGATE-CLOUD: on, after Traefik learned to accept the header from
+        # the balancer subnet (ports.*.proxyProtocol below, applied first).
+        load-balancer.hetzner.cloud/uses-proxyprotocol: "true"
 
     # TRONGATE-CLOUD: read the visitor's address from a PROXY protocol header,
     # but only on connections from the load balancer's subnet (10.255.0.0/16,
