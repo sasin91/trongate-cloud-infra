@@ -114,9 +114,9 @@ spec:
   # A hand-set tag must stay quoted: an all-digit-ish sha parses as a number.
   images:
     - name: registry.trongate.cloud/platform/trongate-cloud
-      newTag: "main-20261013133120-5f93051" # {"$imagepolicy": "flux-system:trongate-cloud:tag"}
+      newTag: "main-20261013181750-3c61742" # {"$imagepolicy": "flux-system:trongate-cloud:tag"}
     - name: registry.trongate.cloud/platform/trongate-cloud-worker
-      newTag: "main-20261013133120-5f93051" # {"$imagepolicy": "flux-system:trongate-cloud:tag"}
+      newTag: "main-20261013181750-3c61742" # {"$imagepolicy": "flux-system:trongate-cloud:tag"}
   # No postBuild substitution: files/storageclass.yaml carries ${...} in its
   # pathPattern (README step 3).
   #
